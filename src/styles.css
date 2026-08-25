@@ -76,6 +76,13 @@ main{max-width:1180px;margin:auto;padding:32px 20px}
 .recents h2{margin:0 0 12px}
 .recents button{width:100%;display:flex;justify-content:space-between;gap:10px;margin-top:8px;text-align:left}
 .recents small{color:var(--muted)}
+.settings-panel{margin-top:18px;padding:18px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+.settings-panel h2{margin:0 0 12px}
+.settings-panel div{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font-weight:800}
+.settings-panel code{padding:6px 9px;overflow-wrap:anywhere}
+.update-toast{position:fixed;right:18px;bottom:18px;z-index:30;display:flex;align-items:center;gap:10px;max-width:min(420px,calc(100% - 36px));padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);font-weight:800}
+.update-toast span{min-width:0}
+.update-toast button{flex:0 0 auto}
 .runner{max-width:900px}
 .toggle{border:1px solid var(--border);padding:9px 12px;border-radius:var(--radius);font-weight:800;display:flex;align-items:center;gap:8px}
 .toggle input,.check input{width:auto;accent-color:var(--accent)}
@@ -172,6 +179,7 @@ main{max-width:1180px;margin:auto;padding:32px 20px}
  .command button{width:100%}
  .bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:12;display:grid;grid-template-columns:repeat(5,1fr);gap:0;background:var(--surface);border-top:1px solid var(--border);padding:6px env(safe-area-inset-right) calc(6px + env(safe-area-inset-bottom)) env(safe-area-inset-left)}
  .bottom-nav a,.bottom-nav button{border:0;background:transparent;color:var(--text);font-size:11px;min-height:48px;padding:6px 4px;text-align:center;display:grid;place-items:center}
+ .update-toast{left:12px;right:12px;bottom:calc(78px + env(safe-area-inset-bottom));max-width:none}
 }
 
 .compact-hero{grid-template-columns:minmax(0,1fr);padding:18px 0 12px}

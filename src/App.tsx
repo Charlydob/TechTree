@@ -106,7 +106,7 @@ const mediaTypes:MediaType[]=['image','video','youtube','link'];
 
 const ui={
  es:{
-  library:'Biblioteca',run:'Ejecutar',edit:'Editar',onsite:'En el sitio',startOver:'Empezar de nuevo',back:'Atras',importRunbook:'Importar guia',createGuide:'+ Nueva guia',createTroubleshooting:'Crear troubleshooting',search:'Buscar',settings:'Ajustes',home:'Inicio',add:'Anadir',
+  library:'Biblioteca',run:'Ejecutar',edit:'Editar',onsite:'En el sitio',startOver:'Empezar de nuevo',back:'Atras',importRunbook:'Importar guia',createGuide:'+ Nueva guia',createTroubleshooting:'Crear troubleshooting',search:'Buscar',settings:'Ajustes',home:'Inicio',add:'Anadir',version:'Version',newVersion:'Hay una nueva version disponible',updateApp:'Actualizar',
   runHelp:'Modo completo con contexto, avisos e historial.',onsiteHelp:'Modo ultrarrapido para trabajar fisicamente con el equipo.',editHelp:'Modificar este procedimiento.',
   problem:'Que quieres hacer?',searchPlaceholder:'Buscar error, dispositivo o procedimiento...',resolver:'Resolver',procedures:'Procedimientos',recent:'Recientes',recentEmpty:'Todavia no hay actividad reciente.',fieldKnowledge:'How to Do Everything',heroText:'Procedimientos interactivos para hacer, arreglar y documentar casi cualquier cosa.',
   noResults:'No tenemos una solucion guardada para este error.',addSolution:'Anadir solucion',cancel:'Cancelar',filters:'Filtros',clear:'Limpiar',category:'Categoria',tags:'Etiquetas',copy:'Copiar',copied:'Copiado',expected:'Esperado',continue:'Continuar',solved:'Solucionado',markSolved:'Marcar como solucionado',
@@ -117,7 +117,7 @@ const ui={
   disconnect:'Desconectar',changeTarget:'Cambiar destino',selectedConnection:'Conexion seleccionada',globalNodeHelp:'Las acciones globales crean nodos aislados.',manualConnect:'Arrastra desde un handle para conectar.',branchHelp:'Cada opcion representa un posible resultado y puede conducir a un paso diferente.',nodeOutcomeHelp:'Nodo = paso/pregunta/accion. Opcion = rama que sale de un nodo.',createNextNode:'Crear siguiente nodo',multimedia:'Multimedia',image:'Imagen',video:'Video',youtube:'YouTube',link:'Enlace',url:'URL',caption:'Caption',alt:'Alt text',mediaTitle:'Titulo del medio',quickEdit:'Edicion rapida',close:'Cerrar',moveUp:'Subir',moveDown:'Bajar',
  },
  en:{
-  library:'Library',run:'Run',edit:'Edit',onsite:'On Site',startOver:'Start over',back:'Back',importRunbook:'Import runbook',createGuide:'+ New guide',createTroubleshooting:'Create troubleshooting',search:'Search',settings:'Settings',home:'Home',add:'Add',
+  library:'Library',run:'Run',edit:'Edit',onsite:'On Site',startOver:'Start over',back:'Back',importRunbook:'Import runbook',createGuide:'+ New guide',createTroubleshooting:'Create troubleshooting',search:'Search',settings:'Settings',home:'Home',add:'Add',version:'Version',newVersion:'A new version is available',updateApp:'Update',
   runHelp:'Full mode with context, warnings and history.',onsiteHelp:'Ultra-fast mode while working with the equipment.',editHelp:'Modify this procedure.',
   problem:'What do you want to do?',searchPlaceholder:'Search error, device or procedure...',resolver:'Resolve',procedures:'Procedures',recent:'Recents',recentEmpty:'No recent activity yet.',fieldKnowledge:'How to Do Everything',heroText:'Interactive procedures for making, fixing, and documenting almost anything.',
   noResults:'We do not have a saved solution for this error.',addSolution:'Add solution',cancel:'Cancel',filters:'Filters',clear:'Clear',category:'Category',tags:'Tags',copy:'Copy',copied:'Copied',expected:'Expected',continue:'Continue',solved:'Solved',markSolved:'Mark solved',
@@ -140,6 +140,7 @@ function nodeTypeLabel(type:NodeType,t:Record<string,string>){const labels:Recor
 function mediaTypeLabel(type:MediaType,t:Record<string,string>){return ({image:t.image,video:t.video,youtube:t.youtube,link:t.link})[type]}
 
 export default function App(){
+ const buildVersion=__APP_BUILD_VERSION__;
  const [books,setBooks]=useState<Runbook[]>(()=>loadLibrary(defaultBooks));
  const [folders,setFolders]=useState<FolderItem[]>(()=>loadFolders(loadLibrary(defaultBooks)));
  const [selected,setSelected]=useState<string>();
@@ -160,6 +161,7 @@ export default function App(){
  const [lang,setLang]=useState<Language>(()=>getStoredLanguage());
  const [dark,setDark]=useState(()=>getStoredTheme()?getStoredTheme()==='dark':typeof matchMedia==='function'&&matchMedia('(prefers-color-scheme: dark)').matches);
  const [recents,setRecents]=useState<RecentItem[]>(()=>loadRecents());
+ const [updateAvailable,setUpdateAvailable]=useState(false);
  const t=ui[lang];
 
  useEffect(()=>saveLibrary(books),[books]);
@@ -168,6 +170,11 @@ export default function App(){
  useEffect(()=>{saveLanguage(lang);document.documentElement.lang=lang;document.title='HTDE - How to Do Everything'},[lang]);
  useEffect(()=>saveTheme(dark),[dark]);
  useEffect(()=>saveRecents(recents),[recents]);
+ useEffect(()=>{
+  const show=()=>setUpdateAvailable(true);
+  window.addEventListener('techtree:update-available',show);
+  return ()=>window.removeEventListener('techtree:update-available',show);
+ },[]);
 
  const folderPaths=useMemo(()=>new Map(folders.map(folder=>[folder.id,folderPath(folder,folders)])),[folders]);
  const book=books.find(item=>item.id===selected);
@@ -294,6 +301,7 @@ export default function App(){
    </section>
 
    <section className="recents" id="recents"><h2>{t.recent}</h2>{recents.length===0?<p>{t.recentEmpty}</p>:recents.slice(0,8).map(item=><button key={item.id} onClick={()=>{const recentBook=books.find(b=>b.id===item.bookId);if(recentBook)open(recentBook,'run',item.nodeId);else if(item.query)setSearch(item.query)}}><span>{item.label}</span><small>{new Date(item.at).toLocaleString()}</small></button>)}</section>
+   <section className="settings-panel" id="settings"><h2>{t.settings}</h2><div><span>{t.version}</span><code>{buildVersion}</code></div></section>
   </main>}
 
   {book&&mode==='run'&&<Runner key={`${book.id}-${targetNode??'start'}-${lang}-${site}`} book={book} onsite={site} setOnsite={setSite} startAt={targetNode} lang={lang} t={t} markRecent={addRecent} canEdit onSave={update}/>}
@@ -303,7 +311,8 @@ export default function App(){
   {quickCreate&&<QuickSolutionModal query={quickCreate} close={()=>setQuickCreate(undefined)} accept={saveQuick} lang={lang} t={t}/>}
   {deleteFolder&&<FolderDeleteModal intent={deleteFolder} close={()=>setDeleteFolder(undefined)} t={t} apply={deleteContents=>deleteFolderTree(deleteFolder.folder,deleteContents)}/>}
   {moving&&<MoveFolderModal moving={moving} folders={folders} folderPaths={folderPaths} t={t} close={()=>setMoving(undefined)} apply={moveBook}/>}
-  {mode==='library'&&<nav className="bottom-nav"><a href="#search">{t.search}</a><a href="#library">{t.library}</a><button onClick={()=>setCreating(true)}>{t.add}</button><a href="#recents">{t.recent}</a><button onClick={()=>setImporting(true)}>{t.importRunbook}</button></nav>}
+  {updateAvailable&&<div className="update-toast" role="status"><span>{t.newVersion} -&gt;</span><button className="primary" onClick={()=>window.dispatchEvent(new CustomEvent('techtree:apply-update'))}>{t.updateApp}</button></div>}
+  {mode==='library'&&<nav className="bottom-nav"><a href="#search">{t.search}</a><a href="#library">{t.library}</a><button onClick={()=>setCreating(true)}>{t.add}</button><a href="#recents">{t.recent}</a><a href="#settings">{t.settings}</a></nav>}
  </div>;
 }
 
