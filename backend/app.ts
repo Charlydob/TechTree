@@ -5,6 +5,8 @@ import {ConflictError,NotFoundError,type RunbookStore} from './types';
 import {assertRunbookId,assertValidRunbook} from './validation/runbookValidation';
 import type {FolderItem} from '../src/lib/storage';
 
+type EventType='runbook.created'|'runbook.updated'|'runbook.deleted'|'folders.updated';
+
 interface AppOptions {
  store:RunbookStore;
  appPassword:string;
@@ -50,6 +52,13 @@ function validateFolders(value:unknown):FolderItem[]{
 
 export function createApp({store,appPassword,sessionSecret,secureCookies=process.env.NODE_ENV==='production',jsonLimit='2mb'}:AppOptions){
  const app=express();
+ const clients=new Set<express.Response>();
+ let revision=0;
+ const publish=(type:EventType,payload:Record<string,unknown>={})=>{
+  const event={type,revision:++revision,...payload};
+  const data=`event: ${type}\ndata: ${JSON.stringify(event)}\n\n`;
+  for(const client of clients)client.write(data);
+ };
  app.disable('x-powered-by');
  app.use(express.json({limit:jsonLimit}));
  app.use(cookieParser());
@@ -81,6 +90,21 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
 
  app.use('/api',requireAuth(sessionSecret));
 
+ app.get('/api/events',(request,response)=>{
+  response.setHeader('Content-Type','text/event-stream');
+  response.setHeader('Cache-Control','no-cache, no-transform');
+  response.setHeader('Connection','keep-alive');
+  response.flushHeaders?.();
+  response.write(`: connected\n\n`);
+  clients.add(response);
+  const keepAlive=setInterval(()=>response.write(`: keep-alive ${Date.now()}\n\n`),25000);
+  request.on('close',()=>{
+   clearInterval(keepAlive);
+   clients.delete(response);
+   response.end();
+  });
+ });
+
  app.get('/api/runbooks',async (_request,response,next)=>{
   try{
    response.json({runbooks:await store.listRunbooks()});
@@ -103,7 +127,9 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
  app.post('/api/runbooks',async (request,response,next)=>{
   try{
    const runbook=assertValidRunbook(request.body?.runbook??request.body);
-   response.status(201).json(await store.createRunbook(runbook));
+   const stored=await store.createRunbook(runbook);
+   publish('runbook.created',{id:stored.runbook.id});
+   response.status(201).json(stored);
   }catch(error){
    next(error);
   }
@@ -114,7 +140,9 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
    const id=assertRunbookId(request.params.id);
    const expectedVersion=validateVersion(request.body?.expectedVersion);
    const runbook=assertValidRunbook(request.body?.runbook);
-   response.json(await store.updateRunbook(id,runbook,expectedVersion!));
+   const stored=await store.updateRunbook(id,runbook,expectedVersion!);
+   publish('runbook.updated',{id:stored.runbook.id});
+   response.json(stored);
   }catch(error){
    next(error);
   }
@@ -125,6 +153,7 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
    const id=assertRunbookId(request.params.id);
    const expectedVersion=validateVersion(request.query.expectedVersion, false);
    const deleted=await store.deleteRunbook(id,expectedVersion);
+   if(deleted)publish('runbook.deleted',{id});
    response.status(deleted?200:404).json(deleted?{ok:true}:{error:'not_found',message:'Runbook not found.'});
   }catch(error){
    next(error);
@@ -135,7 +164,9 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
   try{
    const id=assertRunbookId(request.params.id);
    const newId=assertRunbookId(request.body?.newId);
-   response.status(201).json(await store.duplicateRunbook(id,newId));
+   const stored=await store.duplicateRunbook(id,newId);
+   publish('runbook.created',{id:stored.runbook.id});
+   response.status(201).json(stored);
   }catch(error){
    next(error);
   }
@@ -152,7 +183,9 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
  app.put('/api/folders',async (request,response,next)=>{
   try{
    const folders=validateFolders(request.body?.folders);
-   response.json({folders:await store.replaceFolders(folders)});
+   const saved=await store.replaceFolders(folders);
+   publish('folders.updated');
+   response.json({folders:saved});
   }catch(error){
    next(error);
   }
@@ -175,11 +208,20 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
     if(change.type==='save'){
      const runbook=assertValidRunbook(change.runbook);
      const expectedVersion=validateVersion(change.expectedVersion,false);
-     results.push(expectedVersion?await store.updateRunbook(runbook.id,runbook,expectedVersion):await store.createRunbook(runbook));
+     const stored=expectedVersion?await store.updateRunbook(runbook.id,runbook,expectedVersion):await store.createRunbook(runbook);
+     publish(expectedVersion?'runbook.updated':'runbook.created',{id:stored.runbook.id});
+     results.push(stored);
     }else if(change.type==='delete'){
      const id=assertRunbookId(change.id);
      const expectedVersion=validateVersion(change.expectedVersion,false);
-     results.push({id,deleted:await store.deleteRunbook(id,expectedVersion)});
+     const deleted=await store.deleteRunbook(id,expectedVersion);
+     if(deleted)publish('runbook.deleted',{id});
+     results.push({id,deleted});
+    }else if(change.type==='folders'){
+     const folders=validateFolders(change.folders);
+     const saved=await store.replaceFolders(folders);
+     publish('folders.updated');
+     results.push({folders:saved});
     }else{
      throw validationError('Unsupported sync change type');
     }

@@ -68,20 +68,20 @@ import {
  saveRecents,
  saveTheme,
 } from './lib/storage';
-import {ApiConflictError,AuthRequiredError,ImportRunbookExistsError,LocalRunbookRepository,OfflineError,ServerRunbookRepository,type MigrationResult,type SyncState} from './lib/repository';
+import {ApiConflictError,AuthRequiredError,ImportRunbookExistsError,ImportVerificationError,LocalRunbookRepository,OfflineError,ServerRunbookRepository,type MigrationResult,type RunbookMismatchDetails,type SyncState} from './lib/repository';
 import {exportRunbookJson,parseRunbookJson} from './lib/importExport';
 import {collectLocalizedText,getNode,localized,localize,migrateRunbook,nodeSearchText,slugify,splitList,toLines} from './lib/runbook';
 import {validateRunbook} from './lib/validation';
 
 type Mode='library'|'run'|'edit';
 type EditorView='diagram'|'cards';
-type SearchResult={book:Runbook;node?:RunbookNode;score:number;snippet:string};
+type SearchResult={book:Runbook;node?:RunbookNode;score:number;snippet:string;path:string};
 type DraftNodeField='symptoms'|'aliases';
 type DeleteFolderIntent={folder:FolderItem;count:number};
 type MoveMenu={bookId:string;folder:string};
 type ConflictIntent={runbook:Runbook;message:string};
 type ImportConflictIntent={runbook:Runbook;serverRunbook:Runbook};
-type ImportFailureIntent={runbook:Runbook;message:string;serverRunbook?:Runbook};
+type ImportFailureIntent={runbook:Runbook;message:string;serverRunbook?:Runbook;details?:RunbookMismatchDetails};
 type FlowLink={source:string;target:string;label:string;outcomeId?:string};
 type SelectedEdge={sourceId:string;targetId:string;outcomeId?:string;label:string};
 type FlowNodeData={
@@ -116,7 +116,7 @@ const ui={
   problem:'Que quieres hacer?',searchPlaceholder:'Buscar error, dispositivo o procedimiento...',resolver:'Resolver',procedures:'Procedimientos',recent:'Recientes',recentEmpty:'Todavia no hay actividad reciente.',fieldKnowledge:'How to Do Everything',heroText:'Procedimientos interactivos para hacer, arreglar y documentar casi cualquier cosa.',
   noResults:'No tenemos una solucion guardada para este error.',addSolution:'Anadir solucion',cancel:'Cancelar',filters:'Filtros',clear:'Limpiar',category:'Categoria',tags:'Etiquetas',copy:'Copiar',copied:'Copiado',expected:'Esperado',continue:'Continuar',solved:'Solucionado',markSolved:'Marcar como solucionado',
   duplicate:'Duplicar',exportJson:'Exportar JSON',toggleTheme:'Cambiar tema',language:'Idioma',spanish:'Espanol',english:'English',importTitle:'Importar un procedimiento JSON',drop:'Suelta un archivo .json aqui',choose:'o eligelo en tu dispositivo',validationFailed:'Validacion fallida',reviewWarnings:'Revisar avisos',preview:'Vista previa',importIntoLibrary:'Importar a biblioteca',replaceNotice:'La importacion reemplazara la guia local con este ID.',
-  serverImportConflict:'Ya existe una guia con este ID en el servidor.',replaceServer:'Reemplazar version del servidor',importAsCopy:'Importar como copia',savedLocalPending:'Guardado localmente, pendiente de sincronizar.',retry:'Reintentar',importFailed:'No se pudo guardar en servidor.',
+  serverImportConflict:'Ya existe una guía con este ID',replaceServer:'Reemplazar servidor con archivo importado',importAsCopy:'Importar como copia',savedLocalPending:'Guardado localmente, pendiente de sincronizar.',retry:'Reintentar',importFailed:'No se pudo guardar en servidor.',reconnecting:'⚠️ Reconectando...',forceReplace:'Forzar reemplazo',server:'Servidor',importedFile:'Archivo importado',nodesImported:'Nodos importados',nodesServer:'Nodos servidor',startImported:'startNode importado',startServer:'startNode servidor',updated:'actualizado',resolveFromHere:'Resolver desde aqui',syncDetails:'Detalles de sincronizacion',serverConnected:'Servidor conectado',lastSync:'Ultima sincronizacion',pendingChanges:'Cambios pendientes',realTimeConnection:'Conexion en tiempo real',active:'activa',inactive:'inactiva',now:'ahora',
   editorTitle:'EDITOR VISUAL HTDE',title:'Titulo',description:'Descripcion',nodeId:'ID del nodo',type:'Tipo',body:'Descripcion',command:'Comando',expectedResult:'Resultado esperado',destructive:'Potencialmente destructivo',outcomes:'Opciones / ramas',defaultNext:'Siguiente paso por defecto',validate:'Validar guia',valid:'Estructura valida',issues:'Problemas encontrados',tree:'Diagrama',cards:'Tarjetas',node:'Nodo',addNode:'Nodo aislado',delete:'Eliminar',reset:'Reset layout',save:'Guardar',undo:'Deshacer',redo:'Rehacer',quickBuild:'Acciones rapidas',addNext:'Siguiente paso',addAlternative:'Alternativa',addOutcome:'Anadir opcion / rama',markAsSolution:'Solucion',addCommand:'Comando',addObservedError:'Error',
   newGuide:'Nueva guia',guideName:'Nombre',firstNode:'Primer nodo',languageSeed:'Idioma inicial',create:'Crear',solutionEditor:'Nueva solucion',errorProblem:'Error/problema',variants:'Variantes del error',possibleCause:'Posible causa',step:'Paso',optionalCommand:'Comando opcional',finalSolution:'Solucion final',saveInLibrary:'Guardar en biblioteca',warnings:'Avisos',errors:'Errores',missingNode:'Nodo no encontrado',none:'Ninguno',end:'Fin',mobileSearch:'Buscar',nodeOpen:'Abrir nodo',symptoms:'Sintomas',errorMessages:'Mensajes de error',aliases:'Alias',keywords:'Palabras clave',warning:'Advertencia',verifyBeforeRunning:'verifica antes de ejecutar',oneStepPerLine:'Un paso por linea',
   folders:'Carpetas',newFolder:'+ Nueva carpeta',newSubfolder:'+ Nueva subcarpeta',folder:'Carpeta',allFolders:'Todas',noFolder:'Sin carpeta',rename:'Renombrar',moveFolder:'Mover carpeta',deleteFolder:'Eliminar carpeta',deleteFolderTitle:'Eliminar carpeta',moveToNoFolder:'Mover guias a Sin carpeta',deleteFolderAndContent:'Eliminar carpeta y contenido',collapsedHint:'Toca para expandir',siteLabel:'En el sitio',menu:'Menu',metadata:'Metadata',move:'Mover',deleteGuide:'Eliminar guia',insertStep:'Insertar paso',insertBefore:'Insertar antes',insertAfter:'Insertar despues',autoLayout:'Organizar automaticamente',fitView:'Fit view',center:'Center',visualOnly:'Movimiento visual: no cambia conexiones.',yes:'Si',no:'No',
@@ -128,7 +128,7 @@ const ui={
   problem:'What do you want to do?',searchPlaceholder:'Search error, device or procedure...',resolver:'Resolve',procedures:'Procedures',recent:'Recents',recentEmpty:'No recent activity yet.',fieldKnowledge:'How to Do Everything',heroText:'Interactive procedures for making, fixing, and documenting almost anything.',
   noResults:'We do not have a saved solution for this error.',addSolution:'Add solution',cancel:'Cancel',filters:'Filters',clear:'Clear',category:'Category',tags:'Tags',copy:'Copy',copied:'Copied',expected:'Expected',continue:'Continue',solved:'Solved',markSolved:'Mark solved',
   duplicate:'Duplicate',exportJson:'Export JSON',toggleTheme:'Toggle theme',language:'Language',spanish:'Espanol',english:'English',importTitle:'Import a JSON procedure',drop:'Drop a .json file here',choose:'or choose from your device',validationFailed:'Validation failed',reviewWarnings:'Review warnings',preview:'Preview',importIntoLibrary:'Import into library',replaceNotice:'Importing will replace the local runbook with this ID.',
-  serverImportConflict:'A guide with this ID already exists on the server.',replaceServer:'Replace server version',importAsCopy:'Import as copy',savedLocalPending:'Saved locally, waiting to sync.',retry:'Retry',importFailed:'Could not save to server.',
+  serverImportConflict:'A guide with this ID already exists',replaceServer:'Replace server with imported file',importAsCopy:'Import as copy',savedLocalPending:'Saved locally, waiting to sync.',retry:'Retry',importFailed:'Could not save to server.',reconnecting:'⚠️ Reconnecting...',forceReplace:'Force replace',server:'Server',importedFile:'Imported file',nodesImported:'Imported nodes',nodesServer:'Server nodes',startImported:'Imported startNode',startServer:'Server startNode',updated:'updated',resolveFromHere:'Resolve from here',syncDetails:'Sync details',serverConnected:'Server connected',lastSync:'Last sync',pendingChanges:'Pending changes',realTimeConnection:'Real-time connection',active:'active',inactive:'inactive',now:'now',
   editorTitle:'HTDE VISUAL EDITOR',title:'Title',description:'Description',nodeId:'Node ID',type:'Type',body:'Description',command:'Command',expectedResult:'Expected result',destructive:'Potentially destructive',outcomes:'Options / branches',defaultNext:'Default next step',validate:'Validate guide',valid:'Structure valid',issues:'Issues found',tree:'Diagram',cards:'Cards',node:'Node',addNode:'Loose node',delete:'Delete',reset:'Reset layout',save:'Save',undo:'Undo',redo:'Redo',quickBuild:'Quick actions',addNext:'Next step',addAlternative:'Alternative',addOutcome:'Add option / branch',markAsSolution:'Solution',addCommand:'Command',addObservedError:'Error',
   newGuide:'New guide',guideName:'Name',firstNode:'First node',languageSeed:'Initial language',create:'Create',solutionEditor:'New solution',errorProblem:'Error/problem',variants:'Error variants',possibleCause:'Possible cause',step:'Step',optionalCommand:'Optional command',finalSolution:'Final solution',saveInLibrary:'Save in library',warnings:'Warnings',errors:'Errors',missingNode:'Missing node',none:'None',end:'End',mobileSearch:'Search',nodeOpen:'Open node',symptoms:'Symptoms',errorMessages:'Error messages',aliases:'Aliases',keywords:'Keywords',warning:'Warning',verifyBeforeRunning:'verify before running',oneStepPerLine:'One step per line',
   folders:'Folders',newFolder:'+ New folder',newSubfolder:'+ New subfolder',folder:'Folder',allFolders:'All',noFolder:'No folder',rename:'Rename',moveFolder:'Move folder',deleteFolder:'Delete folder',deleteFolderTitle:'Delete folder',moveToNoFolder:'Move guides to No folder',deleteFolderAndContent:'Delete folder and content',collapsedHint:'Tap to expand',siteLabel:'On site',menu:'Menu',metadata:'Metadata',move:'Move',deleteGuide:'Delete guide',insertStep:'Insert step',insertBefore:'Insert before',insertAfter:'Insert after',autoLayout:'Auto layout',fitView:'Fit view',center:'Center',visualOnly:'Visual move: connections stay unchanged.',yes:'Yes',no:'No',
@@ -151,6 +151,8 @@ export default function App(){
  const buildVersion=__APP_BUILD_VERSION__;
  const repository=useMemo(()=>new ServerRunbookRepository(new LocalRunbookRepository(defaultBooks)),[]);
  const syncReady=useRef(false);
+ const suppressNextFolderPersist=useRef(false);
+ const wasRealtimeDisconnected=useRef(false);
  const [books,setBooks]=useState<Runbook[]>(()=>loadLibrary(defaultBooks));
  const [folders,setFolders]=useState<FolderItem[]>(()=>loadFolders(loadLibrary(defaultBooks)));
  const [selected,setSelected]=useState<string>();
@@ -175,6 +177,9 @@ export default function App(){
  const [syncState,setSyncState]=useState<SyncState>(()=>navigator.onLine?'pending':'offline');
  const [syncMessage,setSyncMessage]=useState('');
  const [pendingCount,setPendingCount]=useState(()=>repository.pendingCount());
+ const [lastSyncAt,setLastSyncAt]=useState<Date>();
+ const [realtimeActive,setRealtimeActive]=useState(false);
+ const [syncDetailsOpen,setSyncDetailsOpen]=useState(false);
  const [authRequired,setAuthRequired]=useState(false);
  const [password,setPassword]=useState('');
  const [migrationPrompt,setMigrationPrompt]=useState(false);
@@ -195,12 +200,14 @@ export default function App(){
   try{
    const pending=await repository.pushPending();
    const snapshot=await repository.list();
+   suppressNextFolderPersist.current=true;
    setBooks(snapshot.runbooks);
    setFolders(snapshot.folders.length?snapshot.folders:loadFolders(snapshot.runbooks));
    setPendingCount(pending);
    setAuthRequired(false);
    setSyncState(pending?'pending':'synced');
    setSyncMessage(pending?t.pending:t.synced);
+   setLastSyncAt(new Date());
    if(repository.needsMigrationPrompt())setMigrationPrompt(true);
    syncReady.current=true;
   }catch(error){
@@ -215,7 +222,7 @@ export default function App(){
   try{
    const saved=await repository.save(next);
    setBooks(items=>items.map(item=>item.id===next.id?saved:item));
-   setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount());
+   setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount());setLastSyncAt(new Date());
   }catch(error){handleSyncError(error,next)}
  },[handleSyncError,repository,t]);
  const forceSaveConflict=useCallback(async()=>{
@@ -224,23 +231,37 @@ export default function App(){
   try{
    const saved=await repository.forceSave(conflict.runbook);
    setBooks(items=>items.map(item=>item.id===conflict.runbook.id?saved:item));
-   setConflict(undefined);setSyncState('synced');setSyncMessage(t.synced);
+   setConflict(undefined);setSyncState('synced');setSyncMessage(t.synced);setLastSyncAt(new Date());
   }catch(error){handleSyncError(error,conflict.runbook)}
  },[conflict,handleSyncError,repository,t]);
  const persistDelete=useCallback(async(source:Runbook)=>{
   setSyncState('saving');setSyncMessage(t.saving);
-  try{await repository.delete(source);setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount())}catch(error){handleSyncError(error,source)}
+  try{await repository.delete(source);setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount());setLastSyncAt(new Date())}catch(error){handleSyncError(error,source)}
  },[handleSyncError,repository,t]);
  const persistFolders=useCallback(async(next:FolderItem[])=>{
-  try{await repository.saveFolders(next);setPendingCount(repository.pendingCount())}catch(error){handleSyncError(error)}
+  try{await repository.saveFolders(next);setPendingCount(repository.pendingCount());setLastSyncAt(new Date())}catch(error){handleSyncError(error)}
  },[handleSyncError,repository]);
  useEffect(()=>saveFolders(folders),[folders]);
- useEffect(()=>{if(syncReady.current)void persistFolders(folders)},[folders,persistFolders]);
+ useEffect(()=>{if(!syncReady.current)return;if(suppressNextFolderPersist.current){suppressNextFolderPersist.current=false;return}void persistFolders(folders)},[folders,persistFolders]);
  useEffect(()=>saveOpenFolders([...openFolders]),[openFolders]);
  useEffect(()=>{saveLanguage(lang);document.documentElement.lang=lang;document.title='HTDE - How to Do Everything'},[lang]);
  useEffect(()=>saveTheme(dark),[dark]);
  useEffect(()=>saveRecents(recents),[recents]);
- useEffect(()=>{const timer=window.setTimeout(()=>void refreshFromServer(),0);const online=()=>void refreshFromServer();window.addEventListener('online',online);return()=>{window.clearTimeout(timer);window.removeEventListener('online',online)}},[refreshFromServer]);
+ useEffect(()=>{const timer=window.setTimeout(()=>void refreshFromServer(),0);const poll=window.setInterval(()=>void refreshFromServer(),30000);const online=()=>void refreshFromServer();window.addEventListener('online',online);return()=>{window.clearTimeout(timer);window.clearInterval(poll);window.removeEventListener('online',online)}},[refreshFromServer]);
+ useEffect(()=>{
+  const unsubscribe=repository.subscribe(()=>void refreshFromServer(),state=>{
+   if(state==='open'){
+    setRealtimeActive(true);
+    if(wasRealtimeDisconnected.current){wasRealtimeDisconnected.current=false;void refreshFromServer()}
+   }else{
+    wasRealtimeDisconnected.current=true;
+    setRealtimeActive(false);
+    setSyncState('reconnecting');
+    setSyncMessage(t.reconnecting);
+   }
+  });
+  return unsubscribe;
+ },[refreshFromServer,repository,t]);
  useEffect(()=>{
   const show=()=>setUpdateAvailable(true);
   window.addEventListener('techtree:update-available',show);
@@ -285,7 +306,7 @@ export default function App(){
   try{
    const saved=await repository.importRunbook(migrated);
    finishImport(saved);
-   setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount());
+   setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount());setLastSyncAt(new Date());
   }catch(error){
    if(error instanceof ImportRunbookExistsError){setImportConflict({runbook:error.importedRunbook,serverRunbook:error.serverRunbook});setSyncState('error');setSyncMessage(t.serverImportConflict);return}
    repository.stageLocalRunbook(migrated);
@@ -293,19 +314,24 @@ export default function App(){
    ensureFolderPath(folderOf(local));setBooks(items=>[local,...items.filter(item=>item.id!==local.id)]);
    if(error instanceof OfflineError){setImporting(false);open(local,'edit');setSyncState('pending');setSyncMessage(t.savedLocalPending);setPendingCount(repository.pendingCount());return}
    if(error instanceof AuthRequiredError)setAuthRequired(true);
+   if(error instanceof ImportVerificationError){
+    setImportFailure({runbook:error.importedRunbook,message:error.message,serverRunbook:error.serverRunbook,details:error.details});
+    setSyncState('error');setSyncMessage(error.message);
+    return;
+   }
    setImportFailure({runbook:local,message:error instanceof Error?error.message:t.importFailed});
    setSyncState(error instanceof AuthRequiredError?'auth':'error');setSyncMessage(error instanceof AuthRequiredError?t.serverLogin:t.importFailed);
   }
  };
  const replaceImported=async(source:Runbook)=>{
   setSyncState('saving');setSyncMessage(t.saving);
-  try{const saved=await repository.replaceImportedRunbook(source);finishImport(saved);setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount())}
-  catch(error){setImportFailure({runbook:source,message:error instanceof Error?error.message:t.importFailed});handleSyncError(error,source)}
+  try{const saved=await repository.replaceImportedRunbook(source);finishImport(saved);setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount());setLastSyncAt(new Date())}
+  catch(error){if(error instanceof ImportVerificationError)setImportFailure({runbook:error.importedRunbook,message:error.message,serverRunbook:error.serverRunbook,details:error.details});else setImportFailure({runbook:source,message:error instanceof Error?error.message:t.importFailed});handleSyncError(error,source)}
  };
  const copyImported=async(source:Runbook)=>{
   setSyncState('saving');setSyncMessage(t.saving);
-  try{const saved=await repository.importRunbookAsCopy(source);finishImport(saved);setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount())}
-  catch(error){const snapshot=repository.localSnapshot();setBooks(snapshot.runbooks);setImportFailure({runbook:source,message:error instanceof Error?error.message:t.importFailed});handleSyncError(error,source)}
+  try{const saved=await repository.importRunbookAsCopy(source);finishImport(saved);setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount());setLastSyncAt(new Date())}
+  catch(error){const snapshot=repository.localSnapshot();setBooks(snapshot.runbooks);if(error instanceof ImportVerificationError)setImportFailure({runbook:error.importedRunbook,message:error.message,serverRunbook:error.serverRunbook,details:error.details});else setImportFailure({runbook:source,message:error instanceof Error?error.message:t.importFailed});handleSyncError(error,source)}
  };
  const createBook=(next:Runbook)=>{ensureFolderPath(folderOf(next));setBooks(items=>[next,...items]);void persistRunbook(next);setCreating(false);open(next,'edit')};
  const saveQuick=(next:Runbook)=>{ensureFolderPath(folderOf(next));setBooks(items=>[next,...items]);void persistRunbook(next);setQuickCreate(undefined);setSearch('');open(next,'edit')};
@@ -334,7 +360,7 @@ export default function App(){
   <header>
    <button className="brand" onClick={()=>setMode('library')} aria-label="HTDE Home"><span>HTDE</span><b>How to Do Everything</b></button>
    <div className="header-actions">
-    <SyncIndicator state={syncState} pending={pendingCount} message={syncMessage} t={t}/>
+     <SyncIndicator state={syncState} pending={pendingCount} message={syncMessage} lastSyncAt={lastSyncAt} realtimeActive={realtimeActive} open={syncDetailsOpen} setOpen={setSyncDetailsOpen} t={t}/>
     <label className="language-select" title={t.language}><span>{t.language}</span><select value={lang} onChange={event=>setLang(event.target.value as Language)}><option value="es">{t.spanish}</option><option value="en">{t.english}</option></select></label>
     <button className="icon-button" title={t.toggleTheme} onClick={()=>setDark(value=>!value)} aria-label={t.toggleTheme}>{dark?<Sun size={18}/>:<Moon size={18}/>}</button>
     {mode!=='library'&&<button onClick={()=>setMode('library')}>{t.library}</button>}
@@ -354,10 +380,10 @@ export default function App(){
 
    {search.trim()&&<section className="results">
     <div className="toolbar compact"><h2>{t.search}</h2><button onClick={()=>setSearch('')}>{t.clear}</button></div>
-    {runSearch.map(result=><article className="result" key={`${result.book.id}-${result.node?.id??'book'}`}>
-     <div><div className="category">{result.node?.tags?.join(' / ')||result.book.tags.slice(0,3).join(' / ')}</div><h3>{localize(result.node?.title??result.book.title,lang)}</h3><p>{result.snippet||localize(result.book.description,lang)}</p></div>
-     <button className="primary" onClick={()=>{open(result.book,'run',result.node?.id);addRecent({bookId:result.book.id,nodeId:result.node?.id,query:search,type:'resolved',label:localize(result.node?.title??result.book.title,lang)})}}>{t.resolver}</button>
-    </article>)}
+     {runSearch.map(result=><article className="result" key={`${result.book.id}-${result.node?.id??'book'}`}>
+      <div><h3>{localize(result.node?.title??result.book.title,lang)}</h3><div className="result-path">{result.path}</div><p>{result.snippet||localize(result.book.description,lang)}</p></div>
+      <button className="primary" onClick={()=>{open(result.book,'run',result.node?.id);addRecent({bookId:result.book.id,nodeId:result.node?.id,query:search,type:'resolved',label:localize(result.node?.title??result.book.title,lang)})}}>{result.node?t.resolveFromHere:t.resolver}</button>
+     </article>)}
     {noRelevant&&<div className="empty-state"><h3>{t.noResults}</h3><div><button className="primary" onClick={()=>setQuickCreate(search)}>{t.addSolution}</button><button onClick={()=>setQuickCreate(search)}>{t.createTroubleshooting}</button><button onClick={()=>setSearch('')}>{t.cancel}</button></div></div>}
    </section>}
 
@@ -421,9 +447,18 @@ export default function App(){
  </div>;
 }
 
-function SyncIndicator({state,pending,message,t}:{state:SyncState;pending:number;message:string;t:Record<string,string>}){
- const label=state==='synced'?t.synced:state==='saving'?t.saving:state==='offline'?t.offline:state==='auth'?t.serverLogin:state==='pending'?t.pending:t.syncError;
- return <span className={`sync-indicator ${state}`} title={message||label}>{label}{pending>0?` (${pending})`:''}</span>;
+function SyncIndicator({state,pending,message,lastSyncAt,realtimeActive,open,setOpen,t}:{state:SyncState;pending:number;message:string;lastSyncAt?:Date;realtimeActive:boolean;open:boolean;setOpen:(value:boolean)=>void;t:Record<string,string>}){
+ const label=state==='synced'?`${t.synced} · ${t.now}`:state==='saving'?t.saving:state==='offline'?t.offline:state==='auth'?t.serverLogin:state==='pending'?t.pending:state==='reconnecting'?t.reconnecting:t.syncError;
+ return <div className="sync-wrap">
+  <button className={`sync-indicator ${state}`} title={message||label} onClick={()=>setOpen(!open)}>{label}{pending>0?` (${pending})`:''}</button>
+  {open&&<div className="sync-popover">
+   <b>{t.syncDetails}</b>
+   <p>{t.serverConnected}: {state==='offline'||state==='auth'||state==='reconnecting'?t.inactive:t.active}</p>
+   <p>{t.lastSync}: {lastSyncAt?lastSyncAt.toLocaleTimeString(): '-'}</p>
+   <p>{t.pendingChanges}: {pending}</p>
+   <p>{t.realTimeConnection}: {realtimeActive?t.active:t.inactive}</p>
+  </div>}
+ </div>;
 }
 
 function LoginModal({password,setPassword,login,t}:{password:string;setPassword:(value:string)=>void;login:()=>Promise<void>;t:Record<string,string>}){
@@ -452,13 +487,20 @@ function ConflictModal({intent,loadServer,keepMine,exportMine,close,t}:{intent:C
 function ImportConflictModal({intent,replace,copy,close,t}:{intent:ImportConflictIntent;replace:()=>Promise<void>;copy:()=>Promise<void>;close:()=>void;t:Record<string,string>}){
  const [error,setError]=useState('');
  const run=async(action:()=>Promise<void>)=>{setError('');try{await action()}catch(err){setError(err instanceof Error?err.message:t.syncError)}};
- return <div className="modal" role="dialog" aria-modal="true"><section className="compact-modal"><button className="close" onClick={close}>x</button><p className="eyebrow">{t.importRunbook}</p><h2>{t.serverImportConflict}</h2><p>{intent.runbook.id}</p>{error&&<p className="errors">{error}</p>}<div className="modal-actions"><button className="danger" onClick={()=>void run(replace)}>{t.replaceServer}</button><button className="primary" onClick={()=>void run(copy)}>{t.importAsCopy}</button><button onClick={close}>{t.cancel}</button></div></section></div>;
+ return <div className="modal" role="dialog" aria-modal="true"><section className="compact-modal"><button className="close" onClick={close}>x</button><p className="eyebrow">{t.importRunbook}</p><h2>{t.serverImportConflict}</h2><p>{intent.runbook.id}</p><ImportSummary imported={intent.runbook} server={intent.serverRunbook} t={t}/>{error&&<p className="errors">{error}</p>}<div className="modal-actions"><button className="danger" onClick={()=>void run(replace)}>{t.replaceServer}</button><button className="primary" onClick={()=>void run(copy)}>{t.importAsCopy}</button><button onClick={close}>{t.cancel}</button></div></section></div>;
 }
 
 function ImportFailureModal({intent,retry,copy,replace,exportJson,close,t}:{intent:ImportFailureIntent;retry:()=>Promise<void>;copy:()=>Promise<void>;replace?:()=>Promise<void>;exportJson:()=>void;close:()=>void;t:Record<string,string>}){
  const [error,setError]=useState('');
  const run=async(action:()=>Promise<void>)=>{setError('');try{await action()}catch(err){setError(err instanceof Error?err.message:t.syncError)}};
- return <div className="modal" role="dialog" aria-modal="true"><section className="compact-modal"><button className="close" onClick={close}>x</button><p className="eyebrow">{t.syncError}</p><h2>{t.importFailed}</h2><p>{intent.message}</p>{error&&<p className="errors">{error}</p>}<div className="modal-actions"><button className="primary" onClick={()=>void run(retry)}>{t.retry}</button><button onClick={exportJson}>{t.exportJson}</button><button onClick={()=>void run(copy)}>{t.importAsCopy}</button>{replace&&<button className="danger" onClick={()=>void run(replace)}>{t.replaceServer}</button>}</div></section></div>;
+ return <div className="modal" role="dialog" aria-modal="true"><section className="compact-modal"><button className="close" onClick={close}>x</button><p className="eyebrow">{t.syncError}</p><h2>{t.importFailed}</h2><p>{intent.message}</p>{intent.serverRunbook&&<ImportSummary imported={intent.runbook} server={intent.serverRunbook} details={intent.details} t={t}/>} {error&&<p className="errors">{error}</p>}<div className="modal-actions"><button className="primary" onClick={()=>void run(retry)}>{t.retry}</button>{replace&&<button className="danger" onClick={()=>void run(replace)}>{t.forceReplace}</button>}<button onClick={()=>void run(copy)}>{t.importAsCopy}</button><button onClick={exportJson}>{t.exportJson}</button></div></section></div>;
+}
+
+function ImportSummary({imported,server,details,t}:{imported:Runbook;server:Runbook;details?:RunbookMismatchDetails;t:Record<string,string>}){
+ return <div className="import-summary">
+  <div><b>{t.server}:</b><span>{t.nodesServer}: {details?.serverNodes??server.nodes.length}</span><span>{t.updated}: {server.metadata?.updatedAt??'-'}</span><span>{t.startServer}: {details?.serverStartNode??server.startNode}</span></div>
+  <div><b>{t.importedFile}:</b><span>{t.nodesImported}: {details?.importedNodes??imported.nodes.length}</span><span>{t.updated}: {imported.metadata?.updatedAt??'-'}</span><span>{t.startImported}: {details?.importedStartNode??imported.startNode}</span></div>
+ </div>;
 }
 
 function FolderTree({folders,books,selected,open,paths,t,setSelected,toggle,addSubfolder,rename,move,remove}:{folders:FolderItem[];books:Runbook[];selected?:string;open:Set<string>;paths:Map<string,string>;t:Record<string,string>;setSelected:(path:string)=>void;toggle:(id:string)=>void;addSubfolder:(parentId:string)=>void;rename:(folder:FolderItem)=>void;move:(folder:FolderItem)=>void;remove:(folder:FolderItem)=>void}){
@@ -490,16 +532,34 @@ function searchResults(books:Runbook[],query:string,tagFilter:string,lang:Langua
  if(!query.trim())return [];
  const results:SearchResult[]=[];
  for(const book of filtered){
-  const bookText=[...collectLocalizedText(book.title),...collectLocalizedText(book.description),book.category,book.folder??'',...book.tags].join(' ');
-  const bookScore=scoreText(query,bookText);
-  if(bookScore>0)results.push({book,score:bookScore,snippet:localize(book.description,lang)});
-  for(const node of book.nodes){
-   const text=nodeSearchText(book,node);
-   const score=scoreText(query,text)+(node.type==='troubleshooting'?18:0);
-   if(score>18)results.push({book,node,score,snippet:bestSnippet(query,text)});
+   const bookText=[...collectLocalizedText(book.title),...collectLocalizedText(book.description),book.category,book.folder??'',...book.tags].join(' ');
+   const bookScore=scoreText(query,bookText);
+   if(bookScore>0)results.push({book,score:bookScore,snippet:localize(book.description,lang),path:folderLabel(folderOf(book),ui[lang])});
+   for(const node of book.nodes){
+    const text=nodeSearchText(book,node);
+    const score=scoreText(query,text)+(node.type==='troubleshooting'?18:0);
+    if(score>18)results.push({book,node,score,snippet:bestSnippet(query,text),path:nodeResultPath(book,node.id,lang)});
+   }
   }
+  return results.sort((a,b)=>b.score-a.score).slice(0,8);
+}
+
+function nodeResultPath(book:Runbook,nodeId:string,lang:Language){
+ const parents=new Map<string,string>();
+ for(const node of book.nodes){
+  if(node.nextNode&&!parents.has(node.nextNode))parents.set(node.nextNode,node.id);
+  for(const outcome of node.outcomes??[])if(outcome.nextNode&&!parents.has(outcome.nextNode))parents.set(outcome.nextNode,node.id);
  }
- return results.sort((a,b)=>b.score-a.score).slice(0,8);
+ const trail:string[]=[];
+ let current=parents.get(nodeId);
+ const seen=new Set([nodeId]);
+ while(current&&!seen.has(current)){
+  const node=getNode(book,current);
+  if(node)trail.unshift(localize(node.title,lang));
+  seen.add(current);
+  current=parents.get(current);
+ }
+ return [localize(book.title,lang),...trail].filter(Boolean).join(' › ');
 }
 
 function youtubeEmbed(url:string){

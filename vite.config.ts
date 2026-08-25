@@ -34,6 +34,7 @@ self.addEventListener('fetch',event=>{
  if(request.method!=='GET')return;
  const url=new URL(request.url);
  if(url.origin!==self.location.origin)return;
+ if(url.pathname.startsWith('/api/'))return;
  if(url.pathname==='/sw.js')return;
  if(request.mode==='navigate'||request.destination==='document'||url.pathname==='/'||url.pathname.endsWith('.html')){
   event.respondWith(networkFirst(request,'/index.html'));

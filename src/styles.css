@@ -27,10 +27,13 @@ figcaption{color:var(--muted);font-size:14px;margin-top:6px}
 .brand:hover{background:transparent}
 .brand span{display:grid;place-items:center;min-width:54px;height:38px;padding:0 7px;border-radius:8px;background:var(--accent);color:white;font-size:13px;font-weight:900}
 .header-actions{display:flex;align-items:center;gap:8px}
+.sync-wrap{position:relative}
 .sync-indicator{display:inline-flex;align-items:center;min-height:34px;max-width:220px;padding:5px 9px;border:1px solid var(--border);border-radius:999px;background:var(--surface-2);color:var(--muted);font-size:12px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sync-indicator.synced{color:var(--success);border-color:color-mix(in srgb,var(--success) 45%,var(--border))}
-.sync-indicator.saving,.sync-indicator.pending{color:var(--warning);border-color:color-mix(in srgb,var(--warning) 45%,var(--border))}
+.sync-indicator.saving,.sync-indicator.pending,.sync-indicator.reconnecting{color:var(--warning);border-color:color-mix(in srgb,var(--warning) 45%,var(--border))}
 .sync-indicator.offline,.sync-indicator.error,.sync-indicator.auth{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,var(--border))}
+.sync-popover{position:absolute;right:0;top:calc(100% + 8px);z-index:15;width:270px;padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);font-size:13px}
+.sync-popover p{margin:7px 0 0;color:var(--muted);font-weight:700}
 .language-select{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700}
 .language-select select{min-width:118px;padding:9px 28px 9px 10px}
 .icon-button{width:44px;padding:0}
@@ -73,6 +76,7 @@ main{max-width:1180px;margin:auto;padding:32px 20px}
 .dots{min-width:46px;padding-inline:10px}
 .results{display:grid;gap:10px;margin-bottom:26px}
 .result{padding:16px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center}
+.result-path{margin:5px 0 8px;color:var(--accent);font-size:13px;font-weight:800}
 .empty-state{background:var(--surface);border:1px dashed var(--border);border-radius:var(--radius);padding:20px}
 .empty-state h3{margin:0 0 14px}
 .empty-state div{display:flex;gap:8px;flex-wrap:wrap}
@@ -132,6 +136,9 @@ main{max-width:1180px;margin:auto;padding:32px 20px}
 .warnings{background:var(--warning-bg);color:var(--warning);border-color:color-mix(in srgb,var(--warning) 45%,transparent)}
 .valid{background:var(--success-bg);color:var(--success);border-color:color-mix(in srgb,var(--success) 45%,transparent)}
 .preview{border-top:1px solid var(--border);margin-top:18px;padding-top:18px}
+.import-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.import-summary>div{display:grid;gap:5px;padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-2)}
+.import-summary span{color:var(--muted);font-size:13px;font-weight:700}
 .wide{width:100%;margin-top:10px}
 .editor{max-width:1400px}
 .title-input{font-size:28px;font-weight:900;border:0;background:transparent!important;padding:4px 0}
@@ -154,7 +161,8 @@ main{max-width:1180px;margin:auto;padding:32px 20px}
  .app>header{height:auto;min-height:60px;padding:8px 12px;align-items:flex-start}
  .brand b{display:none}
  .header-actions{gap:6px;flex-wrap:wrap;justify-content:flex-end}
- .sync-indicator{max-width:140px;font-size:11px;min-height:30px;padding-inline:7px}
+  .sync-indicator{max-width:140px;font-size:11px;min-height:30px;padding-inline:7px}
+  .sync-popover{right:-64px;width:min(270px,calc(100vw - 24px))}
  .language-select span{display:none}
  .language-select select{min-width:104px}
  main{padding:18px 12px}
@@ -170,8 +178,9 @@ main{max-width:1180px;margin:auto;padding:32px 20px}
  .card{padding:16px}
  .mode-help button{display:grid;grid-template-columns:1fr;gap:4px}
  .mode-help small{max-width:none}
- .result{grid-template-columns:1fr}
- .result .primary{width:100%}
+  .result{grid-template-columns:1fr}
+  .result .primary{width:100%}
+  .import-summary{grid-template-columns:1fr}
  .editor-grid{grid-template-columns:1fr}
  .editor aside{max-height:260px;overflow:auto}
  .inspector{padding:16px}

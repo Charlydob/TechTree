@@ -14,10 +14,12 @@ import {
  savePendingChanges,
 } from './storage';
 
-export type SyncState='synced'|'saving'|'offline'|'pending'|'error'|'auth';
+export type SyncState='synced'|'saving'|'offline'|'pending'|'error'|'auth'|'reconnecting';
 export interface StoredRunbook {runbook:Runbook;version:number;createdAt:string;updatedAt:string}
 export interface SyncSnapshot {runbooks:Runbook[];folders:FolderItem[]}
 export interface MigrationResult {uploaded:number;existing:number;conflicts:number;errors:number}
+export interface RunbookMismatchDetails {importedNodes:number;serverNodes:number;importedStartNode:string;serverStartNode:string;importedNodeIds:string[];serverNodeIds:string[]}
+export interface SyncEvent {type:'runbook.created'|'runbook.updated'|'runbook.deleted'|'folders.updated';id?:string;revision:number}
 
 export class AuthRequiredError extends Error {constructor(){super('Authentication required');this.name='AuthRequiredError'}}
 export class OfflineError extends Error {constructor(){super('Offline');this.name='OfflineError'}}
@@ -26,6 +28,12 @@ export class ImportRunbookExistsError extends Error {
  constructor(public importedRunbook:Runbook,public serverRunbook:Runbook){
   super('A server runbook with this ID already exists.');
   this.name='ImportRunbookExistsError';
+ }
+}
+export class ImportVerificationError extends Error {
+ constructor(public importedRunbook:Runbook,public serverRunbook:Runbook,public details:RunbookMismatchDetails){
+  super('El servidor no devolvió la misma guía que acabas de importar.');
+  this.name='ImportVerificationError';
  }
 }
 
@@ -53,6 +61,17 @@ function comparableContent(runbook:Runbook){
 
 function sameRunbookContent(a:Runbook,b:Runbook){
  return JSON.stringify(comparableContent(a))===JSON.stringify(comparableContent(b));
+}
+
+function mismatchDetails(imported:Runbook,server:Runbook):RunbookMismatchDetails{
+ return {
+  importedNodes:imported.nodes.length,
+  serverNodes:server.nodes.length,
+  importedStartNode:imported.startNode,
+  serverStartNode:server.startNode,
+  importedNodeIds:imported.nodes.map(node=>node.id).sort(),
+  serverNodeIds:server.nodes.map(node=>node.id).sort(),
+ };
 }
 
 async function parseApiResponse<T>(response:Response):Promise<T>{
@@ -95,7 +114,10 @@ export class LocalRunbookRepository {
   const pending=loadPendingChanges();
   const compacted=pending.filter(item=>{
    if(change.type==='save'&&item.type==='save')return item.runbook.id!==change.runbook.id;
-   if(change.type==='delete')return item.type!=='save'||item.runbook.id!==change.runbookId;
+   if(change.type==='delete'){
+    if(item.type==='save')return item.runbook.id!==change.runbookId;
+    if(item.type==='delete')return item.runbookId!==change.runbookId;
+   }
    if(change.type==='folders')return item.type!=='folders';
    return true;
   });
@@ -130,6 +152,23 @@ export class ServerRunbookRepository {
   this.updateLocalBook(migrateRunbook(withoutServerVersion(runbook)));
  }
 
+ subscribe(onEvent:(event:SyncEvent)=>void,onStatus?:(state:'open'|'error')=>void){
+  if(typeof EventSource==='undefined')return ()=>undefined;
+  const source=new EventSource(`${this.baseUrl}/events`,{withCredentials:true});
+  const events:SyncEvent['type'][]=['runbook.created','runbook.updated','runbook.deleted','folders.updated'];
+  const listeners=events.map(type=>{
+   const listener=(event:MessageEvent)=>onEvent(JSON.parse(event.data) as SyncEvent);
+   source.addEventListener(type,listener);
+   return {type,listener};
+  });
+  source.onopen=()=>onStatus?.('open');
+  source.onerror=()=>onStatus?.('error');
+  return ()=>{
+   listeners.forEach(({type,listener})=>source.removeEventListener(type,listener));
+   source.close();
+  };
+ }
+
  async login(password:string){
   await parseApiResponse(await fetch(`${this.baseUrl}/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({password})}));
  }
@@ -142,10 +181,10 @@ export class ServerRunbookRepository {
  async list(){
   try{
    const result=await parseApiResponse<{runbooks:StoredRunbook[];folders:FolderItem[]}>(await fetch(`${this.baseUrl}/sync`,{credentials:'include'}));
-   const runbooks=result.runbooks.map(withServerVersion);
-   this.local.saveRunbooks(runbooks);
-   this.local.saveFolders(result.folders);
-   return {runbooks,folders:result.folders};
+   const snapshot=this.applyPendingToServerSnapshot(result.runbooks.map(withServerVersion),result.folders);
+   this.local.saveRunbooks(snapshot.runbooks);
+   this.local.saveFolders(snapshot.folders);
+   return snapshot;
   }catch(error){
    if(error instanceof AuthRequiredError)throw error;
    if(!navigator.onLine||error instanceof TypeError)return this.localSnapshot();
@@ -203,7 +242,7 @@ export class ServerRunbookRepository {
   try{
    const existing=await this.getServerRunbook(imported.id);
    if(existing)throw new ImportRunbookExistsError(imported,existing);
-   const saved=withServerVersion(await parseApiResponse<StoredRunbook>(await fetch(`${this.baseUrl}/runbooks`,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({runbook:withoutServerVersion(imported)})})));
+   const saved=await this.verifyImportedSave(imported,await parseApiResponse<StoredRunbook>(await fetch(`${this.baseUrl}/runbooks`,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({runbook:withoutServerVersion(imported)})})));
    this.updateLocalBook(saved);
    return saved;
   }catch(error){
@@ -223,18 +262,19 @@ export class ServerRunbookRepository {
 
  async replaceImportedRunbook(runbook:Runbook){
   const imported=migrateRunbook(withoutServerVersion(runbook));
+  let expectedVersion: number|undefined;
   try{
    const current=await this.getRequiredServerRunbook(imported.id);
-   const expectedVersion=versionOf(current);
+   expectedVersion=versionOf(current);
    if(!expectedVersion)throw new Error('Server version is required.');
-   const saved=withServerVersion(await parseApiResponse<StoredRunbook>(await fetch(`${this.baseUrl}/runbooks/${encodeURIComponent(imported.id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({runbook:withoutServerVersion(imported),expectedVersion})})));
+   const saved=await this.verifyImportedSave(imported,await parseApiResponse<StoredRunbook>(await fetch(`${this.baseUrl}/runbooks/${encodeURIComponent(imported.id)}`,{method:'PUT',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({runbook:withoutServerVersion(imported),expectedVersion})})));
    this.updateLocalBook(saved);
    return saved;
   }catch(error){
    if(error instanceof ApiConflictError||error instanceof AuthRequiredError)throw error;
    this.updateLocalBook(imported);
    if(error instanceof OfflineError||!navigator.onLine||error instanceof TypeError){
-    this.local.enqueue({id:`pending-${Date.now()}-${Math.random().toString(36).slice(2)}`,type:'save',runbook:imported,expectedVersion:versionOf(imported),createdAt:new Date().toISOString()});
+    this.local.enqueue({id:`pending-${Date.now()}-${Math.random().toString(36).slice(2)}`,type:'save',runbook:imported,expectedVersion,createdAt:new Date().toISOString()});
     throw new OfflineError();
    }
    throw error;
@@ -245,7 +285,7 @@ export class ServerRunbookRepository {
   let copy={...migrateRunbook(withoutServerVersion(runbook)),id:this.uniqueLocalRunbookId(runbook.id),serverVersion:undefined,metadata:{...runbook.metadata,updatedAt:new Date().toISOString()}};
   try{
    copy={...copy,id:await this.uniqueRunbookId(runbook.id)};
-   const saved=withServerVersion(await parseApiResponse<StoredRunbook>(await fetch(`${this.baseUrl}/runbooks`,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({runbook:withoutServerVersion(copy)})})));
+   const saved=await this.verifyImportedSave(copy,await parseApiResponse<StoredRunbook>(await fetch(`${this.baseUrl}/runbooks`,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({runbook:withoutServerVersion(copy)})})));
    this.updateLocalBook(saved);
    return saved;
   }catch(error){
@@ -298,7 +338,10 @@ export class ServerRunbookRepository {
   for(const change of pending){
    try{
     if(change.type==='save')await this.save(change.runbook);
-    if(change.type==='delete')await parseApiResponse(await fetch(`${this.baseUrl}/runbooks/${encodeURIComponent(change.runbookId)}${change.expectedVersion?`?expectedVersion=${change.expectedVersion}`:''}`,{method:'DELETE',credentials:'include'}));
+    if(change.type==='delete'){
+     const response=await fetch(`${this.baseUrl}/runbooks/${encodeURIComponent(change.runbookId)}${change.expectedVersion?`?expectedVersion=${change.expectedVersion}`:''}`,{method:'DELETE',credentials:'include'});
+     if(response.status!==404)await parseApiResponse(response);
+    }
     if(change.type==='folders')await this.saveFolders(change.folders);
    }catch(error){
     if(error instanceof OfflineError||error instanceof AuthRequiredError||error instanceof ApiConflictError)remaining.push(change);
@@ -335,6 +378,24 @@ export class ServerRunbookRepository {
  private updateLocalBook(runbook:Runbook){
   const snapshot=this.local.list();
   this.local.saveRunbooks([runbook,...snapshot.runbooks.filter(item=>item.id!==runbook.id)]);
+ }
+
+ private applyPendingToServerSnapshot(serverRunbooks:Runbook[],serverFolders:FolderItem[]):SyncSnapshot{
+  const pending=this.local.pending();
+  const deleted=new Set(pending.filter(change=>change.type==='delete').map(change=>change.runbookId));
+  const pendingSaves=pending.filter(change=>change.type==='save').map(change=>migrateRunbook(withoutServerVersion(change.runbook)));
+  const runbookMap=new Map(serverRunbooks.filter(runbook=>!deleted.has(runbook.id)).map(runbook=>[runbook.id,runbook]));
+  pendingSaves.forEach(runbook=>{if(!deleted.has(runbook.id))runbookMap.set(runbook.id,runbook)});
+  const folderChange=[...pending].reverse().find(change=>change.type==='folders');
+  return {runbooks:[...runbookMap.values()],folders:folderChange?.type==='folders'?folderChange.folders:serverFolders};
+ }
+
+ private async verifyImportedSave(imported:Runbook,savedItem:StoredRunbook){
+  const saved=withServerVersion(savedItem);
+  const fresh=await this.getRequiredServerRunbook(imported.id);
+  const mismatch=!sameRunbookContent(imported,saved)||!sameRunbookContent(imported,fresh);
+  if(mismatch)throw new ImportVerificationError(imported,!sameRunbookContent(imported,fresh)?fresh:saved,mismatchDetails(imported,!sameRunbookContent(imported,fresh)?fresh:saved));
+  return fresh;
  }
 
  private async getRequiredServerRunbook(id:string){

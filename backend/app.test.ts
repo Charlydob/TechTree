@@ -57,4 +57,40 @@ describe('TechTree API',()=>{
   await agent.put('/api/folders').send({folders}).expect(200);
   await agent.get('/api/folders').expect(200).expect(({body})=>expect(body.folders).toEqual(folders));
  });
+
+ it('emits SSE events after confirmed writes',async()=>{
+  const server=makeApp().listen(0);
+  try{
+   const address=server.address();
+   if(!address||typeof address==='string')throw new Error('Test server did not expose a port');
+   const baseUrl=`http://127.0.0.1:${address.port}`;
+   const loginResponse=await fetch(`${baseUrl}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})});
+   const cookie=loginResponse.headers.get('set-cookie')??'';
+   const events=await fetch(`${baseUrl}/api/events`,{headers:{cookie}});
+   const reader=events.body?.getReader();
+   if(!reader)throw new Error('SSE response did not expose a reader');
+   await reader.read();
+   await fetch(`${baseUrl}/api/runbooks`,{method:'POST',headers:{'Content-Type':'application/json',cookie},body:JSON.stringify({runbook:sample()})});
+   const eventText=await readUntil(reader,'runbook.created');
+   expect(eventText).toContain('event: runbook.created');
+   expect(eventText).toContain('"id":"rfid-integration"');
+   expect(eventText).toContain('"revision":1');
+   await reader.cancel();
+  }finally{
+   await new Promise<void>(resolve=>server.close(()=>resolve()));
+  }
+ });
 });
+
+async function readUntil(reader:ReadableStreamDefaultReader<Uint8Array>,text:string){
+ const decoder=new TextDecoder();
+ let buffer='';
+ const deadline=Date.now()+2000;
+ while(Date.now()<deadline){
+  const {value,done}=await reader.read();
+  if(done)break;
+  buffer+=decoder.decode(value,{stream:true});
+  if(buffer.includes(text))return buffer;
+ }
+ throw new Error(`Timed out waiting for ${text}. Received: ${buffer}`);
+}

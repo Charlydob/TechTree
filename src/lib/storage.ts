@@ -5,8 +5,9 @@ const PENDING='tech-runbook.pending-sync.v1'; const MIGRATION_DONE='tech-runbook
 export interface RecentItem {id:string;bookId:string;nodeId?:string;query?:string;type:'search'|'resolved'|'procedure'|'step';label:string;at:string}
 export interface FolderItem {id:string;name:string;parentId?:string;createdAt:string}
 export type PendingChange={id:string;type:'save';runbook:Runbook;expectedVersion?:number;createdAt:string}|{id:string;type:'delete';runbookId:string;expectedVersion?:number;createdAt:string}|{id:string;type:'folders';folders:FolderItem[];createdAt:string};
+export function pendingDeleteIds(changes:PendingChange[]=loadPendingChanges()){return new Set(changes.filter(change=>change.type==='delete').map(change=>change.runbookId))}
 export function hasStoredLibrary(){return localStorage.getItem(LIBRARY_KEY)!==null}
-export function loadLibrary(fallback:Runbook[]):Runbook[]{try{const raw=localStorage.getItem(LIBRARY_KEY);const books=raw?JSON.parse(raw):fallback;return (books as Runbook[]).map(migrateRunbook)}catch{return fallback.map(migrateRunbook)}}
+export function loadLibrary(fallback:Runbook[]):Runbook[]{try{const raw=localStorage.getItem(LIBRARY_KEY);const books=raw?JSON.parse(raw):fallback;const deleted=pendingDeleteIds();return (books as Runbook[]).map(migrateRunbook).filter(book=>!deleted.has(book.id))}catch{return fallback.map(migrateRunbook).filter(book=>!pendingDeleteIds().has(book.id))}}
 export function saveLibrary(books:Runbook[]){localStorage.setItem(LIBRARY_KEY,JSON.stringify(books))}
 export function loadFolders(books:Runbook[]):FolderItem[]{try{const raw=localStorage.getItem(FOLDERS_KEY);const saved=raw?JSON.parse(raw) as FolderItem[]:[];return mergeFolders(saved,books)}catch{return mergeFolders([],books)}}
 export function saveFolders(folders:FolderItem[]){localStorage.setItem(FOLDERS_KEY,JSON.stringify(folders))}
