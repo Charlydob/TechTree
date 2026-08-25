@@ -1,12 +1,15 @@
 import type {Runbook} from '../types';
 import {migrateRunbook} from './runbook';
-const KEY='tech-runbook.library.v1'; const PROGRESS='tech-runbook.progress.v1'; const RECENTS='tech-runbook.recents.v1'; const LANG='tech-runbook.language.v1'; const THEME='tech-runbook.theme.v1'; const FOLDERS='tech-runbook.folders.v1'; const OPEN_FOLDERS='htde.open-folders.v1';
+export const LIBRARY_KEY='tech-runbook.library.v1'; export const PROGRESS='tech-runbook.progress.v1'; export const RECENTS='tech-runbook.recents.v1'; export const LANG='tech-runbook.language.v1'; export const THEME='tech-runbook.theme.v1'; export const FOLDERS_KEY='tech-runbook.folders.v1'; export const OPEN_FOLDERS='htde.open-folders.v1';
+const PENDING='tech-runbook.pending-sync.v1'; const MIGRATION_DONE='tech-runbook.server-migration.v1';
 export interface RecentItem {id:string;bookId:string;nodeId?:string;query?:string;type:'search'|'resolved'|'procedure'|'step';label:string;at:string}
 export interface FolderItem {id:string;name:string;parentId?:string;createdAt:string}
-export function loadLibrary(fallback:Runbook[]):Runbook[]{try{const raw=localStorage.getItem(KEY);const books=raw?JSON.parse(raw):fallback;return (books as Runbook[]).map(migrateRunbook)}catch{return fallback.map(migrateRunbook)}}
-export function saveLibrary(books:Runbook[]){localStorage.setItem(KEY,JSON.stringify(books))}
-export function loadFolders(books:Runbook[]):FolderItem[]{try{const raw=localStorage.getItem(FOLDERS);const saved=raw?JSON.parse(raw) as FolderItem[]:[];return mergeFolders(saved,books)}catch{return mergeFolders([],books)}}
-export function saveFolders(folders:FolderItem[]){localStorage.setItem(FOLDERS,JSON.stringify(folders))}
+export type PendingChange={id:string;type:'save';runbook:Runbook;expectedVersion?:number;createdAt:string}|{id:string;type:'delete';runbookId:string;expectedVersion?:number;createdAt:string}|{id:string;type:'folders';folders:FolderItem[];createdAt:string};
+export function hasStoredLibrary(){return localStorage.getItem(LIBRARY_KEY)!==null}
+export function loadLibrary(fallback:Runbook[]):Runbook[]{try{const raw=localStorage.getItem(LIBRARY_KEY);const books=raw?JSON.parse(raw):fallback;return (books as Runbook[]).map(migrateRunbook)}catch{return fallback.map(migrateRunbook)}}
+export function saveLibrary(books:Runbook[]){localStorage.setItem(LIBRARY_KEY,JSON.stringify(books))}
+export function loadFolders(books:Runbook[]):FolderItem[]{try{const raw=localStorage.getItem(FOLDERS_KEY);const saved=raw?JSON.parse(raw) as FolderItem[]:[];return mergeFolders(saved,books)}catch{return mergeFolders([],books)}}
+export function saveFolders(folders:FolderItem[]){localStorage.setItem(FOLDERS_KEY,JSON.stringify(folders))}
 function mergeFolders(saved:FolderItem[],books:Runbook[]):FolderItem[]{
  const normalized=saved.map(folder=>({...folder,parentId:folder.parentId||undefined}));
  const paths=new Set(normalized.map(folderPathFactory(normalized)));
@@ -46,3 +49,7 @@ export function getStoredTheme(){return localStorage.getItem(THEME)}
 export function saveTheme(dark:boolean){localStorage.setItem(THEME,dark?'dark':'light')}
 export function loadOpenFolders():string[]{try{return JSON.parse(localStorage.getItem(OPEN_FOLDERS)||'[]')}catch{return[]}}
 export function saveOpenFolders(ids:string[]){localStorage.setItem(OPEN_FOLDERS,JSON.stringify(ids))}
+export function loadPendingChanges():PendingChange[]{try{return JSON.parse(localStorage.getItem(PENDING)||'[]')}catch{return[]}}
+export function savePendingChanges(items:PendingChange[]){localStorage.setItem(PENDING,JSON.stringify(items))}
+export function hasCompletedServerMigration(){return localStorage.getItem(MIGRATION_DONE)==='done'}
+export function markServerMigrationDone(){localStorage.setItem(MIGRATION_DONE,'done')}

@@ -27,6 +27,10 @@ figcaption{color:var(--muted);font-size:14px;margin-top:6px}
 .brand:hover{background:transparent}
 .brand span{display:grid;place-items:center;min-width:54px;height:38px;padding:0 7px;border-radius:8px;background:var(--accent);color:white;font-size:13px;font-weight:900}
 .header-actions{display:flex;align-items:center;gap:8px}
+.sync-indicator{display:inline-flex;align-items:center;min-height:34px;max-width:220px;padding:5px 9px;border:1px solid var(--border);border-radius:999px;background:var(--surface-2);color:var(--muted);font-size:12px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sync-indicator.synced{color:var(--success);border-color:color-mix(in srgb,var(--success) 45%,var(--border))}
+.sync-indicator.saving,.sync-indicator.pending{color:var(--warning);border-color:color-mix(in srgb,var(--warning) 45%,var(--border))}
+.sync-indicator.offline,.sync-indicator.error,.sync-indicator.auth{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,var(--border))}
 .language-select{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700}
 .language-select select{min-width:118px;padding:9px 28px 9px 10px}
 .icon-button{width:44px;padding:0}
@@ -58,7 +62,7 @@ main{max-width:1180px;margin:auto;padding:32px 20px}
 .tag-chip{min-height:32px;padding:5px 9px;border-radius:999px;background:var(--surface-2);font-size:12px;color:var(--muted);border-color:var(--border)}
 .tag-chip.active,.tag-chip:hover{color:var(--text);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 13%,var(--surface))}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
-.card,.result,.step,.modal section,.editor aside,.inspector,.recents{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
+.card,.result,.step,.modal section,.modal form,.editor aside,.inspector,.recents{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)}
 .card{padding:20px;display:flex;flex-direction:column;gap:12px}
 .card h3,.result h3{font-size:22px;margin:0}
 .category{color:var(--accent);font-size:12px;font-weight:900;text-transform:uppercase}
@@ -117,7 +121,7 @@ main{max-width:1180px;margin:auto;padding:32px 20px}
 .step iframe,.media-preview iframe{aspect-ratio:16/9;height:auto;background:#000}
 .media-link{display:flex;align-items:center;gap:8px;padding:12px;border:1px solid var(--border);border-radius:var(--radius);color:var(--accent);font-weight:800;text-decoration:none;overflow-wrap:anywhere}
 .modal{position:fixed;inset:0;background:rgba(3,8,16,.72);display:grid;place-items:center;padding:15px;z-index:20}
-.modal section{width:min(660px,100%);max-height:90vh;overflow:auto;padding:26px;position:relative;box-shadow:var(--shadow)}
+.modal section,.modal form{width:min(660px,100%);max-height:90vh;overflow:auto;padding:26px;position:relative;box-shadow:var(--shadow)}
 .modal h2{margin-top:0}
 .modal label,.inspector label{display:grid;gap:7px;font-weight:700;margin:14px 0}
 .close{position:absolute;right:14px;top:14px;width:42px;padding:0}
@@ -150,6 +154,7 @@ main{max-width:1180px;margin:auto;padding:32px 20px}
  .app>header{height:auto;min-height:60px;padding:8px 12px;align-items:flex-start}
  .brand b{display:none}
  .header-actions{gap:6px;flex-wrap:wrap;justify-content:flex-end}
+ .sync-indicator{max-width:140px;font-size:11px;min-height:30px;padding-inline:7px}
  .language-select span{display:none}
  .language-select select{min-width:104px}
  main{padding:18px 12px}

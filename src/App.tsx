@@ -1,4 +1,4 @@
-import {memo,useCallback,useEffect,useMemo,useState} from 'react';
+import {memo,useCallback,useEffect,useMemo,useRef,useState,type FormEvent} from 'react';
 import dagre from '@dagrejs/dagre';
 import {
  Background,
@@ -68,6 +68,7 @@ import {
  saveRecents,
  saveTheme,
 } from './lib/storage';
+import {ApiConflictError,AuthRequiredError,LocalRunbookRepository,OfflineError,ServerRunbookRepository,type SyncState} from './lib/repository';
 import {collectLocalizedText,getNode,localized,localize,migrateRunbook,nodeSearchText,slugify,splitList,toLines} from './lib/runbook';
 import {validateRunbook} from './lib/validation';
 
@@ -77,6 +78,7 @@ type SearchResult={book:Runbook;node?:RunbookNode;score:number;snippet:string};
 type DraftNodeField='symptoms'|'aliases';
 type DeleteFolderIntent={folder:FolderItem;count:number};
 type MoveMenu={bookId:string;folder:string};
+type ConflictIntent={runbook:Runbook;message:string};
 type FlowLink={source:string;target:string;label:string;outcomeId?:string};
 type SelectedEdge={sourceId:string;targetId:string;outcomeId?:string;label:string};
 type FlowNodeData={
@@ -106,7 +108,7 @@ const mediaTypes:MediaType[]=['image','video','youtube','link'];
 
 const ui={
  es:{
-  library:'Biblioteca',run:'Ejecutar',edit:'Editar',onsite:'En el sitio',startOver:'Empezar de nuevo',back:'Atras',importRunbook:'Importar guia',createGuide:'+ Nueva guia',createTroubleshooting:'Crear troubleshooting',search:'Buscar',settings:'Ajustes',home:'Inicio',add:'Anadir',version:'Version',newVersion:'Hay una nueva version disponible',updateApp:'Actualizar',
+  library:'Biblioteca',run:'Ejecutar',edit:'Editar',onsite:'En el sitio',startOver:'Empezar de nuevo',back:'Atras',importRunbook:'Importar guia',createGuide:'+ Nueva guia',createTroubleshooting:'Crear troubleshooting',search:'Buscar',settings:'Ajustes',home:'Inicio',add:'Anadir',version:'Version',newVersion:'Hay una nueva version disponible',updateApp:'Actualizar',synced:'✅ Sincronizado',saving:'⏳ Guardando',offline:'📴 Sin conexion',pending:'⚠️ Cambios pendientes',syncError:'❌ Error de sincronizacion',login:'Entrar',password:'Contrasena',serverLogin:'Acceso al servidor',migrateLocal:'Hay procedimientos guardados unicamente en este dispositivo. Quieres subirlos al servidor?',uploadLocal:'Subir al servidor',skip:'Ahora no',conflict:'Este procedimiento fue modificado desde otro dispositivo.',loadServer:'Cargar version del servidor',keepMine:'Conservar mi version',exportMine:'Exportar mi version',
   runHelp:'Modo completo con contexto, avisos e historial.',onsiteHelp:'Modo ultrarrapido para trabajar fisicamente con el equipo.',editHelp:'Modificar este procedimiento.',
   problem:'Que quieres hacer?',searchPlaceholder:'Buscar error, dispositivo o procedimiento...',resolver:'Resolver',procedures:'Procedimientos',recent:'Recientes',recentEmpty:'Todavia no hay actividad reciente.',fieldKnowledge:'How to Do Everything',heroText:'Procedimientos interactivos para hacer, arreglar y documentar casi cualquier cosa.',
   noResults:'No tenemos una solucion guardada para este error.',addSolution:'Anadir solucion',cancel:'Cancelar',filters:'Filtros',clear:'Limpiar',category:'Categoria',tags:'Etiquetas',copy:'Copiar',copied:'Copiado',expected:'Esperado',continue:'Continuar',solved:'Solucionado',markSolved:'Marcar como solucionado',
@@ -117,7 +119,7 @@ const ui={
   disconnect:'Desconectar',changeTarget:'Cambiar destino',selectedConnection:'Conexion seleccionada',globalNodeHelp:'Las acciones globales crean nodos aislados.',manualConnect:'Arrastra desde un handle para conectar.',branchHelp:'Cada opcion representa un posible resultado y puede conducir a un paso diferente.',nodeOutcomeHelp:'Nodo = paso/pregunta/accion. Opcion = rama que sale de un nodo.',createNextNode:'Crear siguiente nodo',multimedia:'Multimedia',image:'Imagen',video:'Video',youtube:'YouTube',link:'Enlace',url:'URL',caption:'Caption',alt:'Alt text',mediaTitle:'Titulo del medio',quickEdit:'Edicion rapida',close:'Cerrar',moveUp:'Subir',moveDown:'Bajar',
  },
  en:{
-  library:'Library',run:'Run',edit:'Edit',onsite:'On Site',startOver:'Start over',back:'Back',importRunbook:'Import runbook',createGuide:'+ New guide',createTroubleshooting:'Create troubleshooting',search:'Search',settings:'Settings',home:'Home',add:'Add',version:'Version',newVersion:'A new version is available',updateApp:'Update',
+  library:'Library',run:'Run',edit:'Edit',onsite:'On Site',startOver:'Start over',back:'Back',importRunbook:'Import runbook',createGuide:'+ New guide',createTroubleshooting:'Create troubleshooting',search:'Search',settings:'Settings',home:'Home',add:'Add',version:'Version',newVersion:'A new version is available',updateApp:'Update',synced:'✅ Synced',saving:'⏳ Saving',offline:'📴 Offline',pending:'⚠️ Pending changes',syncError:'❌ Sync error',login:'Sign in',password:'Password',serverLogin:'Server access',migrateLocal:'There are procedures saved only on this device. Do you want to upload them to the server?',uploadLocal:'Upload to server',skip:'Not now',conflict:'This procedure was modified from another device.',loadServer:'Load server version',keepMine:'Keep my version',exportMine:'Export my version',
   runHelp:'Full mode with context, warnings and history.',onsiteHelp:'Ultra-fast mode while working with the equipment.',editHelp:'Modify this procedure.',
   problem:'What do you want to do?',searchPlaceholder:'Search error, device or procedure...',resolver:'Resolve',procedures:'Procedures',recent:'Recents',recentEmpty:'No recent activity yet.',fieldKnowledge:'How to Do Everything',heroText:'Interactive procedures for making, fixing, and documenting almost anything.',
   noResults:'We do not have a saved solution for this error.',addSolution:'Add solution',cancel:'Cancel',filters:'Filters',clear:'Clear',category:'Category',tags:'Tags',copy:'Copy',copied:'Copied',expected:'Expected',continue:'Continue',solved:'Solved',markSolved:'Mark solved',
@@ -141,6 +143,8 @@ function mediaTypeLabel(type:MediaType,t:Record<string,string>){return ({image:t
 
 export default function App(){
  const buildVersion=__APP_BUILD_VERSION__;
+ const repository=useMemo(()=>new ServerRunbookRepository(new LocalRunbookRepository(defaultBooks)),[]);
+ const syncReady=useRef(false);
  const [books,setBooks]=useState<Runbook[]>(()=>loadLibrary(defaultBooks));
  const [folders,setFolders]=useState<FolderItem[]>(()=>loadFolders(loadLibrary(defaultBooks)));
  const [selected,setSelected]=useState<string>();
@@ -162,14 +166,73 @@ export default function App(){
  const [dark,setDark]=useState(()=>getStoredTheme()?getStoredTheme()==='dark':typeof matchMedia==='function'&&matchMedia('(prefers-color-scheme: dark)').matches);
  const [recents,setRecents]=useState<RecentItem[]>(()=>loadRecents());
  const [updateAvailable,setUpdateAvailable]=useState(false);
+ const [syncState,setSyncState]=useState<SyncState>(()=>navigator.onLine?'pending':'offline');
+ const [syncMessage,setSyncMessage]=useState('');
+ const [pendingCount,setPendingCount]=useState(()=>repository.pendingCount());
+ const [authRequired,setAuthRequired]=useState(false);
+ const [password,setPassword]=useState('');
+ const [migrationPrompt,setMigrationPrompt]=useState(false);
+ const [conflict,setConflict]=useState<ConflictIntent>();
  const t=ui[lang];
 
  useEffect(()=>saveLibrary(books),[books]);
+ const handleSyncError=useCallback((error:unknown,runbook?:Runbook)=>{
+  if(error instanceof OfflineError){setSyncState('pending');setSyncMessage(t.pending);setPendingCount(repository.pendingCount());return}
+  if(error instanceof AuthRequiredError){setAuthRequired(true);setSyncState('auth');setSyncMessage(t.serverLogin);return}
+  if(error instanceof ApiConflictError){setConflict({runbook:runbook!,message:error.message||t.conflict});setSyncState('error');setSyncMessage(t.conflict);return}
+  setSyncState('error');setSyncMessage(error instanceof Error?error.message:t.syncError);
+ },[repository,t]);
+ const refreshFromServer=useCallback(async()=>{
+  setSyncState(navigator.onLine?'saving':'offline');
+  try{
+   const pending=await repository.pushPending();
+   const snapshot=await repository.list();
+   setBooks(snapshot.runbooks.length?snapshot.runbooks:defaultBooks);
+   setFolders(snapshot.folders.length?snapshot.folders:loadFolders(snapshot.runbooks));
+   setPendingCount(pending);
+   setAuthRequired(false);
+   setSyncState(pending?'pending':'synced');
+   setSyncMessage(pending?t.pending:t.synced);
+   if(repository.needsMigrationPrompt())setMigrationPrompt(true);
+   syncReady.current=true;
+  }catch(error){
+   const snapshot=repository.localSnapshot();
+   setBooks(snapshot.runbooks);
+   setFolders(snapshot.folders);
+   handleSyncError(error);
+  }
+ },[handleSyncError,repository,t]);
+ const persistRunbook=useCallback(async(next:Runbook)=>{
+  setSyncState('saving');setSyncMessage(t.saving);
+  try{
+   const saved=await repository.save(next);
+   setBooks(items=>items.map(item=>item.id===next.id?saved:item));
+   setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount());
+  }catch(error){handleSyncError(error,next)}
+ },[handleSyncError,repository,t]);
+ const forceSaveConflict=useCallback(async()=>{
+  if(!conflict)return;
+  setSyncState('saving');setSyncMessage(t.saving);
+  try{
+   const saved=await repository.forceSave(conflict.runbook);
+   setBooks(items=>items.map(item=>item.id===conflict.runbook.id?saved:item));
+   setConflict(undefined);setSyncState('synced');setSyncMessage(t.synced);
+  }catch(error){handleSyncError(error,conflict.runbook)}
+ },[conflict,handleSyncError,repository,t]);
+ const persistDelete=useCallback(async(source:Runbook)=>{
+  setSyncState('saving');setSyncMessage(t.saving);
+  try{await repository.delete(source);setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount())}catch(error){handleSyncError(error,source)}
+ },[handleSyncError,repository,t]);
+ const persistFolders=useCallback(async(next:FolderItem[])=>{
+  try{await repository.saveFolders(next);setPendingCount(repository.pendingCount())}catch(error){handleSyncError(error)}
+ },[handleSyncError,repository]);
  useEffect(()=>saveFolders(folders),[folders]);
+ useEffect(()=>{if(syncReady.current)void persistFolders(folders)},[folders,persistFolders]);
  useEffect(()=>saveOpenFolders([...openFolders]),[openFolders]);
  useEffect(()=>{saveLanguage(lang);document.documentElement.lang=lang;document.title='HTDE - How to Do Everything'},[lang]);
  useEffect(()=>saveTheme(dark),[dark]);
  useEffect(()=>saveRecents(recents),[recents]);
+ useEffect(()=>{const timer=window.setTimeout(()=>void refreshFromServer(),0);const online=()=>void refreshFromServer();window.addEventListener('online',online);return()=>{window.clearTimeout(timer);window.removeEventListener('online',online)}},[refreshFromServer]);
  useEffect(()=>{
   const show=()=>setUpdateAvailable(true);
   window.addEventListener('techtree:update-available',show);
@@ -179,10 +242,10 @@ export default function App(){
  const folderPaths=useMemo(()=>new Map(folders.map(folder=>[folder.id,folderPath(folder,folders)])),[folders]);
  const book=books.find(item=>item.id===selected);
  const addRecent=useCallback((item:Omit<RecentItem,'id'|'at'>)=>setRecents(items=>[{...item,id:`recent-${Date.now()}`,at:new Date().toISOString()},...items.filter(old=>old.bookId!==item.bookId||old.nodeId!==item.nodeId||old.query!==item.query)].slice(0,24)),[]);
- const update=(next:Runbook)=>setBooks(items=>items.map(item=>item.id===book?.id?next:item));
+ const update=(next:Runbook)=>{setBooks(items=>items.map(item=>item.id===book?.id?next:item));void persistRunbook(next)};
  const open=(nextBook:Runbook,nextMode:Mode,nodeId?:string)=>{setSelected(nextBook.id);setTargetNode(nodeId);setMode(nextMode);addRecent({bookId:nextBook.id,nodeId,type:nextMode==='run'?'procedure':'step',label:localize(nextBook.title,lang)})};
- const duplicate=(source:Runbook)=>{let id=`${source.id}-copy`,i=2;while(books.some(item=>item.id===id))id=`${source.id}-copy-${i++}`;const copy={...clone(source),id,title:{es:`${localize(source.title,'es')} (copia)`,en:`${localize(source.title,'en')} (Copy)`},metadata:{...source.metadata,author:'HTDE',updatedAt:new Date().toISOString()}};setBooks(items=>[...items,copy]);open(copy,'edit')};
- const removeBook=(source:Runbook)=>{if(confirm(`${t.deleteGuide}: "${localize(source.title,lang)}"?`))setBooks(items=>items.filter(item=>item.id!==source.id))};
+ const duplicate=(source:Runbook)=>{let id=`${source.id}-copy`,i=2;while(books.some(item=>item.id===id))id=`${source.id}-copy-${i++}`;const copy={...clone(source),id,title:{es:`${localize(source.title,'es')} (copia)`,en:`${localize(source.title,'en')} (Copy)`},metadata:{...source.metadata,version:undefined,author:'HTDE',updatedAt:new Date().toISOString()}};setBooks(items=>[...items,copy]);void persistRunbook(copy);open(copy,'edit')};
+ const removeBook=(source:Runbook)=>{if(confirm(`${t.deleteGuide}: "${localize(source.title,lang)}"?`)){setBooks(items=>items.filter(item=>item.id!==source.id));void persistDelete(source)}};
  const runSearch=useMemo(()=>searchResults(books,search,tagFilter,lang),[books,search,tagFilter,lang]);
  const visibleBooks=useMemo(()=>books.filter(item=>{
   const folder=folderOf(item);
@@ -207,13 +270,13 @@ export default function App(){
    return next;
   });
  };
- const acceptBook=(next:Runbook)=>{const migrated=migrateRunbook(next);ensureFolderPath(folderOf(migrated));setBooks(items=>[...items.filter(item=>item.id!==migrated.id),migrated]);setImporting(false);open(migrated,'edit')};
- const createBook=(next:Runbook)=>{ensureFolderPath(folderOf(next));setBooks(items=>[next,...items]);setCreating(false);open(next,'edit')};
- const saveQuick=(next:Runbook)=>{ensureFolderPath(folderOf(next));setBooks(items=>[next,...items]);setQuickCreate(undefined);setSearch('');open(next,'edit')};
+ const acceptBook=(next:Runbook)=>{const migrated=migrateRunbook(next);ensureFolderPath(folderOf(migrated));setBooks(items=>[...items.filter(item=>item.id!==migrated.id),migrated]);void persistRunbook(migrated);setImporting(false);open(migrated,'edit')};
+ const createBook=(next:Runbook)=>{ensureFolderPath(folderOf(next));setBooks(items=>[next,...items]);void persistRunbook(next);setCreating(false);open(next,'edit')};
+ const saveQuick=(next:Runbook)=>{ensureFolderPath(folderOf(next));setBooks(items=>[next,...items]);void persistRunbook(next);setQuickCreate(undefined);setSearch('');open(next,'edit')};
  const createFolder=(parentId?:string)=>{const name=newFolder.trim();if(!name)return;const parentPath=parentId?folderPaths.get(parentId):'';const path=parentPath?`${parentPath}/${name}`:name;if([...folderPaths.values()].some(value=>normalize(value)===normalize(path)))return;setFolders(items=>[...items,{id:uniqueFolderId(name),name,parentId,createdAt:new Date().toISOString()}]);setNewFolder('');setFolderFilter(path);if(parentId)setOpenFolders(ids=>new Set(ids).add(parentId))};
  const rewriteBookFolder=(oldPath:string,newPath:string)=>setBooks(items=>items.map(item=>{
   const current=folderOf(item);
-  if(current===oldPath||current.startsWith(`${oldPath}/`)){const suffix=current.slice(oldPath.length);return {...item,folder:`${newPath}${suffix}`,category:newPath.split('/')[0]||item.category}}
+  if(current===oldPath||current.startsWith(`${oldPath}/`)){const suffix=current.slice(oldPath.length);const next={...item,folder:`${newPath}${suffix}`,category:newPath.split('/')[0]||item.category};void persistRunbook(next);return next}
   return item;
  }));
  const renameFolder=(folder:FolderItem)=>{const oldPath=folderPaths.get(folder.id)??folder.name;const nextName=prompt(t.rename,folder.name)?.trim();if(!nextName||nextName===folder.name)return;const parentPath=folder.parentId?folderPaths.get(folder.parentId):'';const newPath=parentPath?`${parentPath}/${nextName}`:nextName;setFolders(items=>items.map(item=>item.id===folder.id?{...item,name:nextName}:item));rewriteBookFolder(oldPath,newPath);if(folderFilter===oldPath)setFolderFilter(newPath)};
@@ -225,16 +288,17 @@ export default function App(){
   let changed=true;
   while(changed){changed=false;for(const item of folders){if(item.parentId&&ids.has(item.parentId)&&!ids.has(item.id)){ids.add(item.id);changed=true}}}
   setFolders(items=>items.filter(item=>!ids.has(item.id)));
-  setBooks(items=>deleteContents?items.filter(item=>{const current=folderOf(item);return current!==oldPath&&!current.startsWith(`${oldPath}/`)}):items.map(item=>{const current=folderOf(item);return current===oldPath||current.startsWith(`${oldPath}/`)?{...item,folder:uncategorized}:item}));
+  setBooks(items=>deleteContents?items.filter(item=>{const current=folderOf(item);const remove=current===oldPath||current.startsWith(`${oldPath}/`);if(remove)void persistDelete(item);return !remove}):items.map(item=>{const current=folderOf(item);if(current===oldPath||current.startsWith(`${oldPath}/`)){const next={...item,folder:uncategorized};void persistRunbook(next);return next}return item}));
   if(folderFilter===oldPath||folderFilter?.startsWith(`${oldPath}/`))setFolderFilter(undefined);
   setDeleteFolder(undefined);
  };
- const moveBook=(bookId:string,folder:string)=>{ensureFolderPath(folder);setBooks(items=>items.map(item=>item.id===bookId?{...item,folder,category:folder.split('/')[0]||item.category}:item));setMoving(undefined)};
+ const moveBook=(bookId:string,folder:string)=>{ensureFolderPath(folder);setBooks(items=>items.map(item=>{if(item.id!==bookId)return item;const next={...item,folder,category:folder.split('/')[0]||item.category};void persistRunbook(next);return next}));setMoving(undefined)};
 
  return <div className={dark?'app dark':'app'}>
   <header>
    <button className="brand" onClick={()=>setMode('library')} aria-label="HTDE Home"><span>HTDE</span><b>How to Do Everything</b></button>
    <div className="header-actions">
+    <SyncIndicator state={syncState} pending={pendingCount} message={syncMessage} t={t}/>
     <label className="language-select" title={t.language}><span>{t.language}</span><select value={lang} onChange={event=>setLang(event.target.value as Language)}><option value="es">{t.spanish}</option><option value="en">{t.english}</option></select></label>
     <button className="icon-button" title={t.toggleTheme} onClick={()=>setDark(value=>!value)} aria-label={t.toggleTheme}>{dark?<Sun size={18}/>:<Moon size={18}/>}</button>
     {mode!=='library'&&<button onClick={()=>setMode('library')}>{t.library}</button>}
@@ -311,9 +375,39 @@ export default function App(){
   {quickCreate&&<QuickSolutionModal query={quickCreate} close={()=>setQuickCreate(undefined)} accept={saveQuick} lang={lang} t={t}/>}
   {deleteFolder&&<FolderDeleteModal intent={deleteFolder} close={()=>setDeleteFolder(undefined)} t={t} apply={deleteContents=>deleteFolderTree(deleteFolder.folder,deleteContents)}/>}
   {moving&&<MoveFolderModal moving={moving} folders={folders} folderPaths={folderPaths} t={t} close={()=>setMoving(undefined)} apply={moveBook}/>}
+  {authRequired&&<LoginModal password={password} setPassword={setPassword} t={t} login={async()=>{await repository.login(password);setPassword('');setAuthRequired(false);await refreshFromServer()}}/>}
+  {migrationPrompt&&<MigrationModal t={t} count={books.length} close={()=>{repository.markMigrationHandled();setMigrationPrompt(false)}} migrate={async()=>{setSyncState('saving');setSyncMessage(t.saving);try{await repository.migrateLocalRunbooksToServer(books);setMigrationPrompt(false);await refreshFromServer()}catch(error){handleSyncError(error)}}}/>}
+  {conflict&&<ConflictModal intent={conflict} t={t} close={()=>setConflict(undefined)} loadServer={async()=>{setConflict(undefined);await refreshFromServer()}} keepMine={forceSaveConflict} exportMine={()=>download(conflict.runbook)}/>}
   {updateAvailable&&<div className="update-toast" role="status"><span>{t.newVersion} -&gt;</span><button className="primary" onClick={()=>window.dispatchEvent(new CustomEvent('techtree:apply-update'))}>{t.updateApp}</button></div>}
   {mode==='library'&&<nav className="bottom-nav"><a href="#search">{t.search}</a><a href="#library">{t.library}</a><button onClick={()=>setCreating(true)}>{t.add}</button><a href="#recents">{t.recent}</a><a href="#settings">{t.settings}</a></nav>}
  </div>;
+}
+
+function SyncIndicator({state,pending,message,t}:{state:SyncState;pending:number;message:string;t:Record<string,string>}){
+ const label=state==='synced'?t.synced:state==='saving'?t.saving:state==='offline'?t.offline:state==='auth'?t.serverLogin:state==='pending'?t.pending:t.syncError;
+ return <span className={`sync-indicator ${state}`} title={message||label}>{label}{pending>0?` (${pending})`:''}</span>;
+}
+
+function LoginModal({password,setPassword,login,t}:{password:string;setPassword:(value:string)=>void;login:()=>Promise<void>;t:Record<string,string>}){
+ const [error,setError]=useState('');
+ const submit=async(event:FormEvent)=>{
+  event.preventDefault();
+  setError('');
+  try{await login()}catch(err){setError(err instanceof Error?err.message:t.syncError)}
+ };
+ return <div className="modal" role="dialog" aria-modal="true"><form className="compact-modal" onSubmit={submit}><p className="eyebrow">{t.serverLogin}</p><h2>{t.login}</h2><label>{t.password}<input type="password" value={password} onChange={event=>setPassword(event.target.value)} autoFocus/></label>{error&&<p className="errors">{error}</p>}<button className="primary wide" disabled={!password}>{t.login}</button></form></div>;
+}
+
+function MigrationModal({count,migrate,close,t}:{count:number;migrate:()=>Promise<void>;close:()=>void;t:Record<string,string>}){
+ const [error,setError]=useState('');
+ const apply=async()=>{setError('');try{await migrate()}catch(err){setError(err instanceof Error?err.message:t.syncError)}};
+ return <div className="modal" role="dialog" aria-modal="true"><section className="compact-modal"><p className="eyebrow">{t.settings}</p><h2>{t.uploadLocal}</h2><p>{t.migrateLocal}</p><p>{count} {t.procedures.toLowerCase()}</p>{error&&<p className="errors">{error}</p>}<div className="modal-actions"><button onClick={close}>{t.skip}</button><button className="primary" onClick={apply}>{t.uploadLocal}</button></div></section></div>;
+}
+
+function ConflictModal({intent,loadServer,keepMine,exportMine,close,t}:{intent:ConflictIntent;loadServer:()=>Promise<void>;keepMine:()=>Promise<void>;exportMine:()=>void;close:()=>void;t:Record<string,string>}){
+ const [error,setError]=useState('');
+ const run=async(action:()=>Promise<void>)=>{setError('');try{await action()}catch(err){setError(err instanceof Error?err.message:t.syncError)}};
+ return <div className="modal" role="dialog" aria-modal="true"><section className="compact-modal"><button className="close" onClick={close}>x</button><p className="eyebrow">{t.syncError}</p><h2>{t.conflict}</h2><p>{intent.message}</p>{error&&<p className="errors">{error}</p>}<div className="modal-actions"><button onClick={()=>void run(loadServer)}>{t.loadServer}</button><button onClick={()=>void run(keepMine)}>{t.keepMine}</button><button onClick={exportMine}>{t.exportMine}</button></div></section></div>;
 }
 
 function FolderTree({folders,books,selected,open,paths,t,setSelected,toggle,addSubfolder,rename,move,remove}:{folders:FolderItem[];books:Runbook[];selected?:string;open:Set<string>;paths:Map<string,string>;t:Record<string,string>;setSelected:(path:string)=>void;toggle:(id:string)=>void;addSubfolder:(parentId:string)=>void;rename:(folder:FolderItem)=>void;move:(folder:FolderItem)=>void;remove:(folder:FolderItem)=>void}){

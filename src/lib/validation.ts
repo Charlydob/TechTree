@@ -30,7 +30,7 @@ export function validateRunbook(value:unknown):ValidationResult{
   if(new Set(outcomeIds).size!==outcomeIds.length)errors.push(`/nodes/${index}/outcomes: duplicate outcome ids`);
   if(!localize(node.title,'es')&&!localize(node.title,'en'))errors.push(`/nodes/${index}/title: at least one language is required`);
   (node.media??[]).forEach((media,mediaIndex)=>{
-   try{new URL(media.url,location.origin)}catch{errors.push(`/nodes/${index}/media/${mediaIndex}/url: invalid URL`)}
+   try{new URL(media.url,globalThis.location?.origin??'http://localhost')}catch{errors.push(`/nodes/${index}/media/${mediaIndex}/url: invalid URL`)}
   });
  });
 
