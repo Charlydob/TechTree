@@ -13,7 +13,7 @@ function requireEnv(name:string){
 }
 
 function rowToStored(row:{data:Runbook;version:number;created_at:Date|string;updated_at:Date|string}):StoredRunbook{
- const runbook={...row.data,metadata:{...row.data.metadata,version:String(row.version),updatedAt:new Date(row.updated_at).toISOString()}};
+ const runbook={...row.data,metadata:{...row.data.metadata,updatedAt:new Date(row.updated_at).toISOString()}};
  return {runbook,version:row.version,createdAt:new Date(row.created_at).toISOString(),updatedAt:new Date(row.updated_at).toISOString()};
 }
 
@@ -81,7 +81,7 @@ export class PgRunbookStore implements RunbookStore {
  async duplicateRunbook(id:string,newId:string){
   const source=await this.getRunbook(id);
   if(!source)throw new NotFoundError();
-  return this.createRunbook({...source.runbook,id:newId,metadata:{...source.runbook.metadata,version:'1',updatedAt:new Date().toISOString()}});
+  return this.createRunbook({...source.runbook,id:newId,metadata:{...source.runbook.metadata,updatedAt:new Date().toISOString()}});
  }
 
  async listFolders(){

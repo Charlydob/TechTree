@@ -28,6 +28,7 @@ export interface RunbookNode {
 export interface Runbook {
  schemaVersion:1|2;
  id:string;
+ serverVersion?:number;
  title:LocalizedString;
  description:LocalizedString;
  category:string;

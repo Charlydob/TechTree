@@ -13,10 +13,11 @@ export interface ValidationResult {valid:boolean;errors:string[];warnings:string
 const explain=(error:ErrorObject)=>`${error.instancePath||'/'}: ${error.message ?? 'invalid value'}`;
 
 export function validateRunbook(value:unknown):ValidationResult{
- const schemaValid=validateSchema(value);
+ const candidate=stripRuntimeFields(value);
+ const schemaValid=validateSchema(candidate);
  const errors=schemaValid?[]:(validateSchema.errors??[]).map(explain);
  if(!schemaValid)return {valid:false,errors,warnings:[]};
- const book=value as unknown as Runbook;
+ const book=candidate as unknown as Runbook;
  const ids=book.nodes.map(node=>node.id);
  const idSet=new Set(ids);
 
@@ -46,4 +47,11 @@ export function validateRunbook(value:unknown):ValidationResult{
  if(idSet.has(book.startNode))visit(book.startNode);
  const warnings=ids.filter(id=>!reached.has(id)).map(id=>`Node "${id}" is unreachable from START`);
  return {valid:errors.length===0,errors,warnings};
+}
+
+function stripRuntimeFields(value:unknown){
+ if(!value||typeof value!=='object'||Array.isArray(value))return value;
+ const rest={...(value as Record<string,unknown>)};
+ delete rest.serverVersion;
+ return rest;
 }

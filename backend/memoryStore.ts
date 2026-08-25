@@ -22,7 +22,7 @@ export class MemoryRunbookStore implements RunbookStore {
  async createRunbook(runbook:Runbook){
   if(this.runbooks.has(runbook.id))throw new ConflictError('Runbook id already exists.');
   const now=new Date().toISOString();
-  const stored={runbook:{...clone(runbook),metadata:{...runbook.metadata,version:'1',updatedAt:now}},version:1,createdAt:now,updatedAt:now};
+  const stored={runbook:{...clone(runbook),metadata:{...runbook.metadata,updatedAt:now}},version:1,createdAt:now,updatedAt:now};
   this.runbooks.set(runbook.id,stored);
   return clone(stored);
  }
@@ -32,7 +32,7 @@ export class MemoryRunbookStore implements RunbookStore {
   if(!current)throw new NotFoundError();
   if(current.version!==expectedVersion)throw new ConflictError('This runbook was modified from another device.');
   const now=new Date().toISOString();
-  const next={runbook:{...clone(runbook),metadata:{...runbook.metadata,version:String(current.version+1),updatedAt:now}},version:current.version+1,createdAt:current.createdAt,updatedAt:now};
+  const next={runbook:{...clone(runbook),metadata:{...runbook.metadata,updatedAt:now}},version:current.version+1,createdAt:current.createdAt,updatedAt:now};
   if(id!==runbook.id)this.runbooks.delete(id);
   this.runbooks.set(runbook.id,next);
   return clone(next);
@@ -48,7 +48,7 @@ export class MemoryRunbookStore implements RunbookStore {
  async duplicateRunbook(id:string,newId:string){
   const source=this.runbooks.get(id);
   if(!source)throw new NotFoundError();
-  return this.createRunbook({...clone(source.runbook),id:newId,metadata:{...source.runbook.metadata,version:'1',updatedAt:new Date().toISOString()}});
+  return this.createRunbook({...clone(source.runbook),id:newId,metadata:{...source.runbook.metadata,updatedAt:new Date().toISOString()}});
  }
 
  async listFolders(){

@@ -1,4 +1,5 @@
 import {validateRunbook} from '../../src/lib/validation';
+import {toExportedRunbook} from '../../src/lib/importExport';
 import type {Runbook} from '../../src/types';
 
 export function assertValidRunbook(value:unknown):Runbook{
@@ -8,7 +9,7 @@ export function assertValidRunbook(value:unknown):Runbook{
   error.name='ValidationError';
   throw error;
  }
- return value as Runbook;
+ return toExportedRunbook(value as Runbook) as Runbook;
 }
 
 export function assertRunbookId(value:unknown):string{

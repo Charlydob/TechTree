@@ -68,7 +68,8 @@ import {
  saveRecents,
  saveTheme,
 } from './lib/storage';
-import {ApiConflictError,AuthRequiredError,LocalRunbookRepository,OfflineError,ServerRunbookRepository,type SyncState} from './lib/repository';
+import {ApiConflictError,AuthRequiredError,ImportRunbookExistsError,LocalRunbookRepository,OfflineError,ServerRunbookRepository,type MigrationResult,type SyncState} from './lib/repository';
+import {exportRunbookJson,parseRunbookJson} from './lib/importExport';
 import {collectLocalizedText,getNode,localized,localize,migrateRunbook,nodeSearchText,slugify,splitList,toLines} from './lib/runbook';
 import {validateRunbook} from './lib/validation';
 
@@ -79,6 +80,8 @@ type DraftNodeField='symptoms'|'aliases';
 type DeleteFolderIntent={folder:FolderItem;count:number};
 type MoveMenu={bookId:string;folder:string};
 type ConflictIntent={runbook:Runbook;message:string};
+type ImportConflictIntent={runbook:Runbook;serverRunbook:Runbook};
+type ImportFailureIntent={runbook:Runbook;message:string;serverRunbook?:Runbook};
 type FlowLink={source:string;target:string;label:string;outcomeId?:string};
 type SelectedEdge={sourceId:string;targetId:string;outcomeId?:string;label:string};
 type FlowNodeData={
@@ -113,6 +116,7 @@ const ui={
   problem:'Que quieres hacer?',searchPlaceholder:'Buscar error, dispositivo o procedimiento...',resolver:'Resolver',procedures:'Procedimientos',recent:'Recientes',recentEmpty:'Todavia no hay actividad reciente.',fieldKnowledge:'How to Do Everything',heroText:'Procedimientos interactivos para hacer, arreglar y documentar casi cualquier cosa.',
   noResults:'No tenemos una solucion guardada para este error.',addSolution:'Anadir solucion',cancel:'Cancelar',filters:'Filtros',clear:'Limpiar',category:'Categoria',tags:'Etiquetas',copy:'Copiar',copied:'Copiado',expected:'Esperado',continue:'Continuar',solved:'Solucionado',markSolved:'Marcar como solucionado',
   duplicate:'Duplicar',exportJson:'Exportar JSON',toggleTheme:'Cambiar tema',language:'Idioma',spanish:'Espanol',english:'English',importTitle:'Importar un procedimiento JSON',drop:'Suelta un archivo .json aqui',choose:'o eligelo en tu dispositivo',validationFailed:'Validacion fallida',reviewWarnings:'Revisar avisos',preview:'Vista previa',importIntoLibrary:'Importar a biblioteca',replaceNotice:'La importacion reemplazara la guia local con este ID.',
+  serverImportConflict:'Ya existe una guia con este ID en el servidor.',replaceServer:'Reemplazar version del servidor',importAsCopy:'Importar como copia',savedLocalPending:'Guardado localmente, pendiente de sincronizar.',retry:'Reintentar',importFailed:'No se pudo guardar en servidor.',
   editorTitle:'EDITOR VISUAL HTDE',title:'Titulo',description:'Descripcion',nodeId:'ID del nodo',type:'Tipo',body:'Descripcion',command:'Comando',expectedResult:'Resultado esperado',destructive:'Potencialmente destructivo',outcomes:'Opciones / ramas',defaultNext:'Siguiente paso por defecto',validate:'Validar guia',valid:'Estructura valida',issues:'Problemas encontrados',tree:'Diagrama',cards:'Tarjetas',node:'Nodo',addNode:'Nodo aislado',delete:'Eliminar',reset:'Reset layout',save:'Guardar',undo:'Deshacer',redo:'Rehacer',quickBuild:'Acciones rapidas',addNext:'Siguiente paso',addAlternative:'Alternativa',addOutcome:'Anadir opcion / rama',markAsSolution:'Solucion',addCommand:'Comando',addObservedError:'Error',
   newGuide:'Nueva guia',guideName:'Nombre',firstNode:'Primer nodo',languageSeed:'Idioma inicial',create:'Crear',solutionEditor:'Nueva solucion',errorProblem:'Error/problema',variants:'Variantes del error',possibleCause:'Posible causa',step:'Paso',optionalCommand:'Comando opcional',finalSolution:'Solucion final',saveInLibrary:'Guardar en biblioteca',warnings:'Avisos',errors:'Errores',missingNode:'Nodo no encontrado',none:'Ninguno',end:'Fin',mobileSearch:'Buscar',nodeOpen:'Abrir nodo',symptoms:'Sintomas',errorMessages:'Mensajes de error',aliases:'Alias',keywords:'Palabras clave',warning:'Advertencia',verifyBeforeRunning:'verifica antes de ejecutar',oneStepPerLine:'Un paso por linea',
   folders:'Carpetas',newFolder:'+ Nueva carpeta',newSubfolder:'+ Nueva subcarpeta',folder:'Carpeta',allFolders:'Todas',noFolder:'Sin carpeta',rename:'Renombrar',moveFolder:'Mover carpeta',deleteFolder:'Eliminar carpeta',deleteFolderTitle:'Eliminar carpeta',moveToNoFolder:'Mover guias a Sin carpeta',deleteFolderAndContent:'Eliminar carpeta y contenido',collapsedHint:'Toca para expandir',siteLabel:'En el sitio',menu:'Menu',metadata:'Metadata',move:'Mover',deleteGuide:'Eliminar guia',insertStep:'Insertar paso',insertBefore:'Insertar antes',insertAfter:'Insertar despues',autoLayout:'Organizar automaticamente',fitView:'Fit view',center:'Center',visualOnly:'Movimiento visual: no cambia conexiones.',yes:'Si',no:'No',
@@ -124,6 +128,7 @@ const ui={
   problem:'What do you want to do?',searchPlaceholder:'Search error, device or procedure...',resolver:'Resolve',procedures:'Procedures',recent:'Recents',recentEmpty:'No recent activity yet.',fieldKnowledge:'How to Do Everything',heroText:'Interactive procedures for making, fixing, and documenting almost anything.',
   noResults:'We do not have a saved solution for this error.',addSolution:'Add solution',cancel:'Cancel',filters:'Filters',clear:'Clear',category:'Category',tags:'Tags',copy:'Copy',copied:'Copied',expected:'Expected',continue:'Continue',solved:'Solved',markSolved:'Mark solved',
   duplicate:'Duplicate',exportJson:'Export JSON',toggleTheme:'Toggle theme',language:'Language',spanish:'Espanol',english:'English',importTitle:'Import a JSON procedure',drop:'Drop a .json file here',choose:'or choose from your device',validationFailed:'Validation failed',reviewWarnings:'Review warnings',preview:'Preview',importIntoLibrary:'Import into library',replaceNotice:'Importing will replace the local runbook with this ID.',
+  serverImportConflict:'A guide with this ID already exists on the server.',replaceServer:'Replace server version',importAsCopy:'Import as copy',savedLocalPending:'Saved locally, waiting to sync.',retry:'Retry',importFailed:'Could not save to server.',
   editorTitle:'HTDE VISUAL EDITOR',title:'Title',description:'Description',nodeId:'Node ID',type:'Type',body:'Description',command:'Command',expectedResult:'Expected result',destructive:'Potentially destructive',outcomes:'Options / branches',defaultNext:'Default next step',validate:'Validate guide',valid:'Structure valid',issues:'Issues found',tree:'Diagram',cards:'Cards',node:'Node',addNode:'Loose node',delete:'Delete',reset:'Reset layout',save:'Save',undo:'Undo',redo:'Redo',quickBuild:'Quick actions',addNext:'Next step',addAlternative:'Alternative',addOutcome:'Add option / branch',markAsSolution:'Solution',addCommand:'Command',addObservedError:'Error',
   newGuide:'New guide',guideName:'Name',firstNode:'First node',languageSeed:'Initial language',create:'Create',solutionEditor:'New solution',errorProblem:'Error/problem',variants:'Error variants',possibleCause:'Possible cause',step:'Step',optionalCommand:'Optional command',finalSolution:'Final solution',saveInLibrary:'Save in library',warnings:'Warnings',errors:'Errors',missingNode:'Missing node',none:'None',end:'End',mobileSearch:'Search',nodeOpen:'Open node',symptoms:'Symptoms',errorMessages:'Error messages',aliases:'Aliases',keywords:'Keywords',warning:'Warning',verifyBeforeRunning:'verify before running',oneStepPerLine:'One step per line',
   folders:'Folders',newFolder:'+ New folder',newSubfolder:'+ New subfolder',folder:'Folder',allFolders:'All',noFolder:'No folder',rename:'Rename',moveFolder:'Move folder',deleteFolder:'Delete folder',deleteFolderTitle:'Delete folder',moveToNoFolder:'Move guides to No folder',deleteFolderAndContent:'Delete folder and content',collapsedHint:'Tap to expand',siteLabel:'On site',menu:'Menu',metadata:'Metadata',move:'Move',deleteGuide:'Delete guide',insertStep:'Insert step',insertBefore:'Insert before',insertAfter:'Insert after',autoLayout:'Auto layout',fitView:'Fit view',center:'Center',visualOnly:'Visual move: connections stay unchanged.',yes:'Yes',no:'No',
@@ -134,12 +139,13 @@ const ui={
 function normalize(value:string){return value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
 function scoreText(query:string,text:string){const q=normalize(query);const hay=normalize(text);if(!q)return 0;let score=hay.includes(q)?80:0;for(const token of q.split(/\s+/).filter(Boolean)){if(hay.includes(token))score+=12;else if(hay.split(/\s+/).some(part=>part.startsWith(token)||token.startsWith(part)))score+=5}return score}
 function bestSnippet(query:string,text:string){const q=normalize(query).split(/\s+/).find(Boolean);if(!q)return text.slice(0,140);const flat=text.replace(/\s+/g,' ');const index=normalize(flat).indexOf(q);const start=Math.max(0,index-45);return flat.slice(start,start+150)}
-function download(book:Runbook){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(book,null,2)],{type:'application/json'}));a.download=`${book.id}.json`;a.click();URL.revokeObjectURL(a.href)}
+function download(book:Runbook){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([exportRunbookJson(book)],{type:'application/json'}));a.download=`${book.id}.json`;a.click();URL.revokeObjectURL(a.href)}
 function folderOf(book:Runbook){return book.folder??book.category??uncategorized}
 function folderLabel(name:string,t:Record<string,string>){return name||t.noFolder}
 function uniqueFolderId(name:string){return `folder-${Date.now()}-${Math.random().toString(36).slice(2,7)}-${slugify(name||'sin-carpeta')}`}
 function nodeTypeLabel(type:NodeType,t:Record<string,string>){const labels:Record<NodeType,string>={action:'Accion',question:'Pregunta',check:'Comprobacion',command:t.addCommand,troubleshooting:t.addObservedError,warning:t.warning,solution:t.markAsSolution,note:'Nota','visual-identification':'Identificacion visual',multimedia:'Multimedia'};return labels[type]??type}
 function mediaTypeLabel(type:MediaType,t:Record<string,string>){return ({image:t.image,video:t.video,youtube:t.youtube,link:t.link})[type]}
+function migrationSummary(result:MigrationResult){return `${result.uploaded} subidos / ${result.existing} ya existentes / ${result.conflicts} conflictos / ${result.errors} errores`}
 
 export default function App(){
  const buildVersion=__APP_BUILD_VERSION__;
@@ -173,6 +179,8 @@ export default function App(){
  const [password,setPassword]=useState('');
  const [migrationPrompt,setMigrationPrompt]=useState(false);
  const [conflict,setConflict]=useState<ConflictIntent>();
+ const [importConflict,setImportConflict]=useState<ImportConflictIntent>();
+ const [importFailure,setImportFailure]=useState<ImportFailureIntent>();
  const t=ui[lang];
 
  useEffect(()=>saveLibrary(books),[books]);
@@ -187,7 +195,7 @@ export default function App(){
   try{
    const pending=await repository.pushPending();
    const snapshot=await repository.list();
-   setBooks(snapshot.runbooks.length?snapshot.runbooks:defaultBooks);
+   setBooks(snapshot.runbooks);
    setFolders(snapshot.folders.length?snapshot.folders:loadFolders(snapshot.runbooks));
    setPendingCount(pending);
    setAuthRequired(false);
@@ -244,7 +252,7 @@ export default function App(){
  const addRecent=useCallback((item:Omit<RecentItem,'id'|'at'>)=>setRecents(items=>[{...item,id:`recent-${Date.now()}`,at:new Date().toISOString()},...items.filter(old=>old.bookId!==item.bookId||old.nodeId!==item.nodeId||old.query!==item.query)].slice(0,24)),[]);
  const update=(next:Runbook)=>{setBooks(items=>items.map(item=>item.id===book?.id?next:item));void persistRunbook(next)};
  const open=(nextBook:Runbook,nextMode:Mode,nodeId?:string)=>{setSelected(nextBook.id);setTargetNode(nodeId);setMode(nextMode);addRecent({bookId:nextBook.id,nodeId,type:nextMode==='run'?'procedure':'step',label:localize(nextBook.title,lang)})};
- const duplicate=(source:Runbook)=>{let id=`${source.id}-copy`,i=2;while(books.some(item=>item.id===id))id=`${source.id}-copy-${i++}`;const copy={...clone(source),id,title:{es:`${localize(source.title,'es')} (copia)`,en:`${localize(source.title,'en')} (Copy)`},metadata:{...source.metadata,version:undefined,author:'HTDE',updatedAt:new Date().toISOString()}};setBooks(items=>[...items,copy]);void persistRunbook(copy);open(copy,'edit')};
+ const duplicate=(source:Runbook)=>{let id=`${source.id}-copy`,i=2;while(books.some(item=>item.id===id))id=`${source.id}-copy-${i++}`;const copy={...clone(source),id,serverVersion:undefined,title:{es:`${localize(source.title,'es')} (copia)`,en:`${localize(source.title,'en')} (Copy)`},metadata:{...source.metadata,author:'HTDE',updatedAt:new Date().toISOString()}};setBooks(items=>[...items,copy]);void persistRunbook(copy);open(copy,'edit')};
  const removeBook=(source:Runbook)=>{if(confirm(`${t.deleteGuide}: "${localize(source.title,lang)}"?`)){setBooks(items=>items.filter(item=>item.id!==source.id));void persistDelete(source)}};
  const runSearch=useMemo(()=>searchResults(books,search,tagFilter,lang),[books,search,tagFilter,lang]);
  const visibleBooks=useMemo(()=>books.filter(item=>{
@@ -270,7 +278,35 @@ export default function App(){
    return next;
   });
  };
- const acceptBook=(next:Runbook)=>{const migrated=migrateRunbook(next);ensureFolderPath(folderOf(migrated));setBooks(items=>[...items.filter(item=>item.id!==migrated.id),migrated]);void persistRunbook(migrated);setImporting(false);open(migrated,'edit')};
+ const finishImport=(saved:Runbook)=>{ensureFolderPath(folderOf(saved));setBooks(items=>[saved,...items.filter(item=>item.id!==saved.id)]);setImporting(false);setImportConflict(undefined);setImportFailure(undefined);open(saved,'edit')};
+ const acceptBook=async(next:Runbook)=>{
+  const migrated=migrateRunbook(next);
+  setSyncState('saving');setSyncMessage(t.saving);
+  try{
+   const saved=await repository.importRunbook(migrated);
+   finishImport(saved);
+   setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount());
+  }catch(error){
+   if(error instanceof ImportRunbookExistsError){setImportConflict({runbook:error.importedRunbook,serverRunbook:error.serverRunbook});setSyncState('error');setSyncMessage(t.serverImportConflict);return}
+   repository.stageLocalRunbook(migrated);
+   const local=repository.localSnapshot().runbooks.find(item=>item.id===migrated.id)??migrated;
+   ensureFolderPath(folderOf(local));setBooks(items=>[local,...items.filter(item=>item.id!==local.id)]);
+   if(error instanceof OfflineError){setImporting(false);open(local,'edit');setSyncState('pending');setSyncMessage(t.savedLocalPending);setPendingCount(repository.pendingCount());return}
+   if(error instanceof AuthRequiredError)setAuthRequired(true);
+   setImportFailure({runbook:local,message:error instanceof Error?error.message:t.importFailed});
+   setSyncState(error instanceof AuthRequiredError?'auth':'error');setSyncMessage(error instanceof AuthRequiredError?t.serverLogin:t.importFailed);
+  }
+ };
+ const replaceImported=async(source:Runbook)=>{
+  setSyncState('saving');setSyncMessage(t.saving);
+  try{const saved=await repository.replaceImportedRunbook(source);finishImport(saved);setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount())}
+  catch(error){setImportFailure({runbook:source,message:error instanceof Error?error.message:t.importFailed});handleSyncError(error,source)}
+ };
+ const copyImported=async(source:Runbook)=>{
+  setSyncState('saving');setSyncMessage(t.saving);
+  try{const saved=await repository.importRunbookAsCopy(source);finishImport(saved);setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount())}
+  catch(error){const snapshot=repository.localSnapshot();setBooks(snapshot.runbooks);setImportFailure({runbook:source,message:error instanceof Error?error.message:t.importFailed});handleSyncError(error,source)}
+ };
  const createBook=(next:Runbook)=>{ensureFolderPath(folderOf(next));setBooks(items=>[next,...items]);void persistRunbook(next);setCreating(false);open(next,'edit')};
  const saveQuick=(next:Runbook)=>{ensureFolderPath(folderOf(next));setBooks(items=>[next,...items]);void persistRunbook(next);setQuickCreate(undefined);setSearch('');open(next,'edit')};
  const createFolder=(parentId?:string)=>{const name=newFolder.trim();if(!name)return;const parentPath=parentId?folderPaths.get(parentId):'';const path=parentPath?`${parentPath}/${name}`:name;if([...folderPaths.values()].some(value=>normalize(value)===normalize(path)))return;setFolders(items=>[...items,{id:uniqueFolderId(name),name,parentId,createdAt:new Date().toISOString()}]);setNewFolder('');setFolderFilter(path);if(parentId)setOpenFolders(ids=>new Set(ids).add(parentId))};
@@ -376,8 +412,10 @@ export default function App(){
   {deleteFolder&&<FolderDeleteModal intent={deleteFolder} close={()=>setDeleteFolder(undefined)} t={t} apply={deleteContents=>deleteFolderTree(deleteFolder.folder,deleteContents)}/>}
   {moving&&<MoveFolderModal moving={moving} folders={folders} folderPaths={folderPaths} t={t} close={()=>setMoving(undefined)} apply={moveBook}/>}
   {authRequired&&<LoginModal password={password} setPassword={setPassword} t={t} login={async()=>{await repository.login(password);setPassword('');setAuthRequired(false);await refreshFromServer()}}/>}
-  {migrationPrompt&&<MigrationModal t={t} count={books.length} close={()=>{repository.markMigrationHandled();setMigrationPrompt(false)}} migrate={async()=>{setSyncState('saving');setSyncMessage(t.saving);try{await repository.migrateLocalRunbooksToServer(books);setMigrationPrompt(false);await refreshFromServer()}catch(error){handleSyncError(error)}}}/>}
+  {migrationPrompt&&<MigrationModal t={t} count={books.length} close={()=>{repository.markMigrationHandled();setMigrationPrompt(false)}} migrate={async()=>{setSyncState('saving');setSyncMessage(t.saving);const result=await repository.migrateLocalRunbooksToServer(books);await refreshFromServer();setSyncState(result.conflicts||result.errors?'error':'synced');setSyncMessage(migrationSummary(result));return result}}/>}
   {conflict&&<ConflictModal intent={conflict} t={t} close={()=>setConflict(undefined)} loadServer={async()=>{setConflict(undefined);await refreshFromServer()}} keepMine={forceSaveConflict} exportMine={()=>download(conflict.runbook)}/>}
+  {importConflict&&<ImportConflictModal intent={importConflict} t={t} close={()=>setImportConflict(undefined)} replace={()=>replaceImported(importConflict.runbook)} copy={()=>copyImported(importConflict.runbook)}/>}
+  {importFailure&&<ImportFailureModal intent={importFailure} t={t} close={()=>setImportFailure(undefined)} retry={()=>acceptBook(importFailure.runbook)} copy={()=>copyImported(importFailure.runbook)} replace={importFailure.serverRunbook?()=>replaceImported(importFailure.runbook):undefined} exportJson={()=>download(importFailure.runbook)}/>}
   {updateAvailable&&<div className="update-toast" role="status"><span>{t.newVersion} -&gt;</span><button className="primary" onClick={()=>window.dispatchEvent(new CustomEvent('techtree:apply-update'))}>{t.updateApp}</button></div>}
   {mode==='library'&&<nav className="bottom-nav"><a href="#search">{t.search}</a><a href="#library">{t.library}</a><button onClick={()=>setCreating(true)}>{t.add}</button><a href="#recents">{t.recent}</a><a href="#settings">{t.settings}</a></nav>}
  </div>;
@@ -398,16 +436,29 @@ function LoginModal({password,setPassword,login,t}:{password:string;setPassword:
  return <div className="modal" role="dialog" aria-modal="true"><form className="compact-modal" onSubmit={submit}><p className="eyebrow">{t.serverLogin}</p><h2>{t.login}</h2><label>{t.password}<input type="password" value={password} onChange={event=>setPassword(event.target.value)} autoFocus/></label>{error&&<p className="errors">{error}</p>}<button className="primary wide" disabled={!password}>{t.login}</button></form></div>;
 }
 
-function MigrationModal({count,migrate,close,t}:{count:number;migrate:()=>Promise<void>;close:()=>void;t:Record<string,string>}){
+function MigrationModal({count,migrate,close,t}:{count:number;migrate:()=>Promise<MigrationResult>;close:()=>void;t:Record<string,string>}){
  const [error,setError]=useState('');
- const apply=async()=>{setError('');try{await migrate()}catch(err){setError(err instanceof Error?err.message:t.syncError)}};
- return <div className="modal" role="dialog" aria-modal="true"><section className="compact-modal"><p className="eyebrow">{t.settings}</p><h2>{t.uploadLocal}</h2><p>{t.migrateLocal}</p><p>{count} {t.procedures.toLowerCase()}</p>{error&&<p className="errors">{error}</p>}<div className="modal-actions"><button onClick={close}>{t.skip}</button><button className="primary" onClick={apply}>{t.uploadLocal}</button></div></section></div>;
+ const [result,setResult]=useState<MigrationResult>();
+ const apply=async()=>{setError('');try{setResult(await migrate())}catch(err){setError(err instanceof Error?err.message:t.syncError)}};
+ return <div className="modal" role="dialog" aria-modal="true"><section className="compact-modal"><p className="eyebrow">{t.settings}</p><h2>{t.uploadLocal}</h2><p>{t.migrateLocal}</p><p>{count} {t.procedures.toLowerCase()}</p>{result&&<p>{migrationSummary(result)}</p>}{error&&<p className="errors">{error}</p>}<div className="modal-actions"><button onClick={close}>{result?t.close:t.skip}</button><button className="primary" onClick={apply}>{t.uploadLocal}</button></div></section></div>;
 }
 
 function ConflictModal({intent,loadServer,keepMine,exportMine,close,t}:{intent:ConflictIntent;loadServer:()=>Promise<void>;keepMine:()=>Promise<void>;exportMine:()=>void;close:()=>void;t:Record<string,string>}){
  const [error,setError]=useState('');
  const run=async(action:()=>Promise<void>)=>{setError('');try{await action()}catch(err){setError(err instanceof Error?err.message:t.syncError)}};
  return <div className="modal" role="dialog" aria-modal="true"><section className="compact-modal"><button className="close" onClick={close}>x</button><p className="eyebrow">{t.syncError}</p><h2>{t.conflict}</h2><p>{intent.message}</p>{error&&<p className="errors">{error}</p>}<div className="modal-actions"><button onClick={()=>void run(loadServer)}>{t.loadServer}</button><button onClick={()=>void run(keepMine)}>{t.keepMine}</button><button onClick={exportMine}>{t.exportMine}</button></div></section></div>;
+}
+
+function ImportConflictModal({intent,replace,copy,close,t}:{intent:ImportConflictIntent;replace:()=>Promise<void>;copy:()=>Promise<void>;close:()=>void;t:Record<string,string>}){
+ const [error,setError]=useState('');
+ const run=async(action:()=>Promise<void>)=>{setError('');try{await action()}catch(err){setError(err instanceof Error?err.message:t.syncError)}};
+ return <div className="modal" role="dialog" aria-modal="true"><section className="compact-modal"><button className="close" onClick={close}>x</button><p className="eyebrow">{t.importRunbook}</p><h2>{t.serverImportConflict}</h2><p>{intent.runbook.id}</p>{error&&<p className="errors">{error}</p>}<div className="modal-actions"><button className="danger" onClick={()=>void run(replace)}>{t.replaceServer}</button><button className="primary" onClick={()=>void run(copy)}>{t.importAsCopy}</button><button onClick={close}>{t.cancel}</button></div></section></div>;
+}
+
+function ImportFailureModal({intent,retry,copy,replace,exportJson,close,t}:{intent:ImportFailureIntent;retry:()=>Promise<void>;copy:()=>Promise<void>;replace?:()=>Promise<void>;exportJson:()=>void;close:()=>void;t:Record<string,string>}){
+ const [error,setError]=useState('');
+ const run=async(action:()=>Promise<void>)=>{setError('');try{await action()}catch(err){setError(err instanceof Error?err.message:t.syncError)}};
+ return <div className="modal" role="dialog" aria-modal="true"><section className="compact-modal"><button className="close" onClick={close}>x</button><p className="eyebrow">{t.syncError}</p><h2>{t.importFailed}</h2><p>{intent.message}</p>{error&&<p className="errors">{error}</p>}<div className="modal-actions"><button className="primary" onClick={()=>void run(retry)}>{t.retry}</button><button onClick={exportJson}>{t.exportJson}</button><button onClick={()=>void run(copy)}>{t.importAsCopy}</button>{replace&&<button className="danger" onClick={()=>void run(replace)}>{t.replaceServer}</button>}</div></section></div>;
 }
 
 function FolderTree({folders,books,selected,open,paths,t,setSelected,toggle,addSubfolder,rename,move,remove}:{folders:FolderItem[];books:Runbook[];selected?:string;open:Set<string>;paths:Map<string,string>;t:Record<string,string>;setSelected:(path:string)=>void;toggle:(id:string)=>void;addSubfolder:(parentId:string)=>void;rename:(folder:FolderItem)=>void;move:(folder:FolderItem)=>void;remove:(folder:FolderItem)=>void}){
@@ -506,11 +557,11 @@ function Runner({book,onsite,setOnsite,startAt,lang,t,markRecent,canEdit,onSave}
  </main>;
 }
 
-function Importer({close,accept,books,lang,t}:{close:()=>void;accept:(book:Runbook)=>void;books:Runbook[];lang:Language;t:Record<string,string>}){
+function Importer({close,accept,books,lang,t}:{close:()=>void;accept:(book:Runbook)=>Promise<void>;books:Runbook[];lang:Language;t:Record<string,string>}){
  const [candidate,setCandidate]=useState<Runbook>();
  const [errors,setErrors]=useState<string[]>([]);
- const read=(file?:File)=>{if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const data=migrateRunbook(JSON.parse(String(reader.result)) as Runbook);const result=validateRunbook(data);setErrors([...result.errors,...result.warnings.map(warning=>`${t.warnings}: ${warning}`)]);setCandidate(result.valid?data:undefined)}catch(error){setErrors([`/: Invalid JSON - ${error instanceof Error?error.message:'parse failed'}`]);setCandidate(undefined)}};reader.readAsText(file)};
- return <div className="modal" role="dialog" aria-modal="true"><section><button className="close" onClick={close}>x</button><p className="eyebrow">{t.importRunbook}</p><h2>{t.importTitle}</h2><label className="drop" onDragOver={event=>event.preventDefault()} onDrop={event=>{event.preventDefault();read(event.dataTransfer.files[0])}}>{t.drop}<br/><span>{t.choose}</span><input type="file" accept=".json,application/json" onChange={event=>read(event.target.files?.[0])}/></label>{errors.length>0&&<div className={candidate?'warnings':'errors'}><b>{candidate?t.reviewWarnings:t.validationFailed}</b>{errors.map((error,index)=><p key={index}>{error}</p>)}</div>}{candidate&&<div className="preview"><b>{t.preview}</b><h3>{localize(candidate.title,lang)}</h3><p>{localize(candidate.description,lang)}</p><p>{candidate.nodes.length} {t.node} / {candidate.category}</p>{books.some(book=>book.id===candidate.id)&&<p>{t.replaceNotice}</p>}<button className="primary" onClick={()=>accept(candidate)}>{t.importIntoLibrary}</button></div>}</section></div>;
+ const read=(file?:File)=>{if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const data=parseRunbookJson(String(reader.result));const result=validateRunbook(data);setErrors([...result.errors,...result.warnings.map(warning=>`${t.warnings}: ${warning}`)]);setCandidate(result.valid?data:undefined)}catch(error){setErrors([`/: Invalid JSON - ${error instanceof Error?error.message:'parse failed'}`]);setCandidate(undefined)}};reader.readAsText(file)};
+ return <div className="modal" role="dialog" aria-modal="true"><section><button className="close" onClick={close}>x</button><p className="eyebrow">{t.importRunbook}</p><h2>{t.importTitle}</h2><label className="drop" onDragOver={event=>event.preventDefault()} onDrop={event=>{event.preventDefault();read(event.dataTransfer.files[0])}}>{t.drop}<br/><span>{t.choose}</span><input type="file" accept=".json,application/json" onChange={event=>read(event.target.files?.[0])}/></label>{errors.length>0&&<div className={candidate?'warnings':'errors'}><b>{candidate?t.reviewWarnings:t.validationFailed}</b>{errors.map((error,index)=><p key={index}>{error}</p>)}</div>}{candidate&&<div className="preview"><b>{t.preview}</b><h3>{localize(candidate.title,lang)}</h3><p>{localize(candidate.description,lang)}</p><p>{candidate.nodes.length} {t.node} / {candidate.category}</p>{books.some(book=>book.id===candidate.id)&&<p>{t.replaceNotice}</p>}<button className="primary" onClick={()=>void accept(candidate)}>{t.importIntoLibrary}</button></div>}</section></div>;
 }
 
 function CreateRunbookModal({close,accept,lang,t,folders,folderPaths}:{close:()=>void;accept:(book:Runbook)=>void;lang:Language;t:Record<string,string>;folders:FolderItem[];folderPaths:Map<string,string>}){
