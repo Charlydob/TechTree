@@ -25,5 +25,10 @@ describe('runbook validation',()=>{
   ];
   expect(validateRunbook(withMedia).valid).toBe(true);
  });
+ it('rejects multimedia without a URL',()=>{
+  const withMedia=structuredClone(rfid) as Runbook;
+  withMedia.nodes[0].media=[{type:'image',url:'',alt:{es:'Captura'}}];
+  expect(validateRunbook(withMedia).valid).toBe(false);
+ });
  it('handles arbitrary JSON',()=>expect(validateRunbook({schemaVersion:1}).valid).toBe(false));
 });

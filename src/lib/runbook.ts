@@ -67,6 +67,13 @@ export function collectLocalizedText(value:LocalizedString|undefined):string[]{
 }
 
 export function nodeSearchText(book:Runbook,node:RunbookNode):string{
+ const mediaText=(node.media??[]).flatMap(media=>[
+  media.url,
+  ...collectLocalizedText(media.title),
+  ...collectLocalizedText(media.alt),
+  ...collectLocalizedText(media.caption),
+  ...collectLocalizedText(media.description),
+ ]);
  const fields=[
   ...collectLocalizedText(book.title),
   ...collectLocalizedText(book.description),
@@ -83,7 +90,18 @@ export function nodeSearchText(book:Runbook,node:RunbookNode):string{
   node.command??'',
   node.cause?collectLocalizedText(node.cause).join(' '):'',
   node.finalSolution?collectLocalizedText(node.finalSolution).join(' '):'',
-  ...(node.outcomes??[]).flatMap(o=>[...collectLocalizedText(o.label),...collectLocalizedText(o.description)]),
+  ...mediaText,
+  ...(node.outcomes??[]).flatMap(o=>[
+   ...collectLocalizedText(o.label),
+   ...collectLocalizedText(o.description),
+   ...(o.media??[]).flatMap(media=>[
+    media.url,
+    ...collectLocalizedText(media.title),
+    ...collectLocalizedText(media.alt),
+    ...collectLocalizedText(media.caption),
+    ...collectLocalizedText(media.description),
+   ]),
+  ]),
  ];
  return fields.filter(Boolean).join(' ');
 }

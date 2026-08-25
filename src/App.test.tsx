@@ -124,4 +124,25 @@ describe('App sync',()=>{
   expect(screen.getByText('Importar a biblioteca')).toBeInTheDocument();
   expect(screen.getByText(/Nodos importados/i)).toBeInTheDocument();
  });
+
+ it('does not add invalid media just by opening the media dialog',async()=>{
+  const source=structuredClone(rfid) as Runbook;
+  vi.stubGlobal('fetch',vi.fn(async (input:RequestInfo|URL)=>{
+   const url=String(input);
+   if(url.endsWith('/sync'))return jsonResponse({runbooks:[stored(source)],folders:[]});
+   throw new Error(`Unexpected request ${url}`);
+  }));
+
+  const {container}=render(<App/>);
+  await waitFor(()=>expect(container.querySelectorAll('.workflow-card')).toHaveLength(1));
+  const editButton=container.querySelector('.workflow-actions button[title="Modificar este procedimiento."]') as HTMLButtonElement;
+  fireEvent.click(editButton);
+  await screen.findByText('EDITOR VISUAL HTDE');
+  const addMedia=container.querySelector('.media-head button') as HTMLButtonElement;
+  fireEvent.click(addMedia);
+  await screen.findByRole('heading',{name:'Anadir multimedia'});
+  expect(localStorage.getItem('tech-runbook.draft.rfid-integration')).toBeNull();
+  fireEvent.click(screen.getByText('Cancelar'));
+  expect(localStorage.getItem('tech-runbook.draft.rfid-integration')).toBeNull();
+ });
 });
