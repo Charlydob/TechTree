@@ -30,10 +30,11 @@ export function toLines(value:string):string[]{
 }
 
 export function migrateRunbook(book:Runbook):Runbook{
- if(book.schemaVersion===2)return book;
+ if(book.schemaVersion===2)return {...book,folder:book.folder??book.category,nodes:book.nodes.map(node=>({...node,ui:node.ui}))};
  return {
   ...book,
   schemaVersion:2,
+  folder:book.folder??book.category,
   title:localizedForBoth(String(book.title),String(book.title)),
   description:localizedForBoth(String(book.description),String(book.description)),
   requirements:book.requirements?.map(x=>localizedForBoth(String(x),String(x))),

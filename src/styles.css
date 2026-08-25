@@ -167,3 +167,109 @@ main{max-width:1180px;margin:auto;padding:32px 20px}
  .bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:12;display:grid;grid-template-columns:repeat(5,1fr);gap:0;background:var(--surface);border-top:1px solid var(--border);padding:6px env(safe-area-inset-right) calc(6px + env(safe-area-inset-bottom)) env(safe-area-inset-left)}
  .bottom-nav a,.bottom-nav button{border:0;background:transparent;color:var(--text);font-size:11px;min-height:48px;padding:6px 4px;text-align:center;display:grid;place-items:center}
 }
+
+.compact-hero{grid-template-columns:minmax(0,1fr);padding:18px 0 12px}
+.compact-hero h1{font-size:clamp(28px,4vw,46px)}
+.dashboard-grid{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
+.folder-rail,.library-panel{min-width:0}
+.folder-rail{position:sticky;top:88px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);padding:12px}
+.rail-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.rail-head button.active,.folder-row.active>button{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface));color:var(--text)}
+.folder-create{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:12px}
+.folder-create button{font-size:13px;min-height:38px;padding:7px 9px}
+.folder-list{display:grid;gap:7px}
+.folder-row{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center}
+.folder-row>button{text-align:left;display:grid;gap:2px;min-height:48px;padding:8px 10px}
+.folder-row small{color:var(--muted);font-weight:600}
+.folder-row>div{display:flex;gap:4px}
+.folder-row>div button{width:34px;min-height:34px;padding:0}
+.library-panel>.toolbar{margin-top:0}
+.tag-strip,.horizontal-tags{display:flex;gap:7px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:5px;scrollbar-width:thin}
+.tag-chip{white-space:nowrap;flex:0 0 auto}
+.compact-cards{display:grid;gap:8px}
+.workflow-card{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);padding:10px 12px;cursor:pointer}
+.workflow-card:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 5%,var(--surface))}
+.workflow-main{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center}
+.workflow-main h3{margin:2px 0 0;font-size:17px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.workflow-actions{display:flex;align-items:center;gap:6px}
+.workflow-actions button,.workflow-actions summary{min-height:36px;padding:7px 10px;font-size:13px;border-radius:var(--radius)}
+.workflow-actions summary{display:grid;place-items:center;border:1px solid var(--border);background:var(--surface);font-weight:900;cursor:pointer;list-style:none}
+.workflow-actions summary::-webkit-details-marker{display:none}
+.overflow-menu{position:relative}
+.overflow-menu>div{position:absolute;right:0;top:42px;z-index:9;display:grid;gap:5px;min-width:180px;padding:8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow)}
+.overflow-menu button{text-align:left;background:transparent}
+.workflow-detail{display:grid;gap:9px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.workflow-detail p{margin:0;color:var(--muted)}
+.detail-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--muted);font-size:13px;font-weight:700}
+.detail-actions button{min-height:34px;padding:6px 10px}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+.form-grid label{margin:0}
+.form-grid label:has(textarea),.form-grid .check{grid-column:span 2}
+.compact-modal{width:min(520px,100%)!important}
+.modal-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}
+
+.visual-editor{max-width:1680px;padding:18px}
+.visual-shell{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:14px;height:calc(100vh - 128px);min-height:620px}
+.flow-surface{position:relative;min-width:0;min-height:0;border:1px solid var(--border);border-radius:var(--radius);background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 4%,transparent),transparent 45%),var(--surface);overflow:hidden}
+.react-flow{background:transparent}
+.react-flow__edge-path{stroke:color-mix(in srgb,var(--accent) 74%,var(--text))}
+.react-flow__handle{width:9px;height:9px;background:var(--accent);border:2px solid var(--surface)}
+.flow-minimap{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.flow-note{position:absolute;left:12px;bottom:10px;margin:0;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);background:color-mix(in srgb,var(--surface) 88%,transparent);color:var(--muted);font-size:12px;font-weight:800;pointer-events:none}
+.flow-card{width:250px;border:1px solid var(--border);border-top:5px solid var(--accent);border-radius:var(--radius);background:var(--surface);box-shadow:0 8px 20px rgba(22,32,51,.1);padding:10px;display:grid;gap:8px}
+.dark .flow-card{box-shadow:0 10px 26px rgba(0,0,0,.32)}
+.flow-card.active{border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 18%,transparent),var(--shadow)}
+.flow-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.flow-card-head span{font-size:10px;text-transform:uppercase;font-weight:900;color:var(--accent)}
+.flow-card-head button{min-height:28px;padding:3px 7px;font-size:11px}
+.flow-card h3{font-size:15px;line-height:1.25;margin:0;overflow-wrap:anywhere}
+.flow-card p{margin:0;color:var(--muted);font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.flow-card code{display:block;max-height:48px;overflow:hidden;padding:7px;font-size:11px;white-space:pre-wrap}
+.node-outcome-row{display:grid;gap:5px}
+.outcome-branch{position:relative;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:32px;border:1px dashed var(--border);border-radius:var(--radius);padding:4px 5px 4px 8px;background:var(--surface-2)}
+.outcome-branch span{font-size:12px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.outcome-branch button,.node-plus>button:first-child{display:grid;place-items:center;width:30px;min-height:30px;padding:0;border-radius:50%;background:var(--accent);color:white;border-color:var(--accent)}
+.node-plus{position:relative;display:flex;align-items:center;justify-content:center;gap:8px;padding-top:5px}
+.node-plus>button:last-of-type{min-height:30px;padding:4px 8px;font-size:11px}
+.node-add-menu{position:absolute;left:50%;top:38px;transform:translateX(-50%);z-index:15;display:grid;grid-template-columns:repeat(2,minmax(110px,1fr));gap:5px;width:250px;padding:8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow)}
+.outcome-branch .node-add-menu{left:auto;right:0;top:36px;transform:none}
+.node-add-menu button{min-height:32px;padding:5px 7px;font-size:12px;text-align:left;background:var(--surface)}
+.edge-add{position:absolute;z-index:8;min-height:26px;padding:3px 7px;border-radius:999px;background:var(--surface);border-color:var(--accent);color:var(--accent);font-size:11px;pointer-events:all}
+.node-sheet{overflow:auto;padding:16px}
+.node-sheet h2{margin:2px 0 0;font-size:20px}
+.node-sheet h3{margin:16px 0 8px}
+.quick-builder{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);margin:12px 0}
+.quick-builder button{min-height:32px;padding:6px 9px;font-size:12px}
+.json-preview{max-height:360px;overflow:auto;padding:16px;margin-top:14px}
+
+@media(max-width:980px){
+ .dashboard-grid{grid-template-columns:1fr}
+ .folder-rail{position:static}
+ .folder-list{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+ .visual-shell{grid-template-columns:1fr;height:auto;min-height:0}
+ .flow-surface{height:64vh;min-height:480px}
+ .node-sheet{position:sticky;bottom:0;z-index:7;max-height:54vh;border-radius:8px 8px 0 0}
+}
+
+@media(max-width:760px){
+ .dashboard-grid{gap:10px}
+ .folder-rail{padding:10px}
+ .folder-create{grid-template-columns:1fr auto}
+ .folder-create button{white-space:nowrap}
+ .workflow-card{padding:8px 9px}
+ .workflow-main{grid-template-columns:1fr;gap:8px}
+ .workflow-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+ .workflow-actions button,.workflow-actions summary{font-size:12px;padding:5px 4px}
+ .workflow-main h3{font-size:15px}
+ .form-grid{grid-template-columns:1fr}
+ .form-grid label:has(textarea),.form-grid .check{grid-column:auto}
+ .visual-editor{padding:10px}
+ .visual-shell{gap:8px}
+ .flow-surface{height:58vh;min-height:430px}
+ .flow-card{width:230px}
+ .node-add-menu{grid-template-columns:1fr;width:210px}
+ .edge-add{font-size:10px;max-width:90px;white-space:normal}
+ .node-sheet{max-height:58vh}
+ .flow-note{right:12px;font-size:11px}
+ .flow-minimap{display:none}
+}

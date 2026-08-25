@@ -7,6 +7,7 @@ export interface RunbookNode {
  id:string;
  type:NodeType;
  title:LocalizedString;
+ ui?:{x?:number;y?:number};
  body?:LocalizedString;
  os?:string[];
  command?:string;
@@ -29,6 +30,8 @@ export interface Runbook {
  title:LocalizedString;
  description:LocalizedString;
  category:string;
+ folder?:string;
+ ui?:{layout?:'horizontal'|'vertical'};
  tags:string[];
  requirements?:LocalizedString[];
  operatingSystems?:string[];

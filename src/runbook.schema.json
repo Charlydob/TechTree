@@ -11,6 +11,14 @@
     "title": {"$ref": "#/$defs/localizedString"},
     "description": {"$ref": "#/$defs/localizedString"},
     "category": {"type": "string", "minLength": 1},
+    "folder": {"type": "string"},
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "layout": {"enum": ["horizontal", "vertical"]}
+      }
+    },
     "tags": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
     "requirements": {"type": "array", "items": {"$ref": "#/$defs/localizedString"}},
     "operatingSystems": {"type": "array", "items": {"type": "string"}},
@@ -73,6 +81,14 @@
         "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
         "type": {"enum": ["question", "action", "command", "check", "warning", "solution", "troubleshooting", "visual-identification", "note", "multimedia"]},
         "title": {"$ref": "#/$defs/localizedString"},
+        "ui": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "x": {"type": "number"},
+            "y": {"type": "number"}
+          }
+        },
         "body": {"$ref": "#/$defs/localizedString"},
         "os": {"type": "array", "items": {"type": "string"}},
         "command": {"type": "string"},
