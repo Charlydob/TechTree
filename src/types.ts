@@ -1,5 +1,38 @@
-export type NodeType='question'|'action'|'command'|'check'|'warning'|'solution'|'visual-identification'|'note';
-export interface Media {type:'image'|'video';url:string;alt:string;caption?:string}
-export interface Outcome {id:string;label:string;nextNode?:string;description?:string;media?:Media[]}
-export interface RunbookNode {id:string;type:NodeType;title:string;body?:string;os?:string[];command?:string;expectedResult?:string;destructive?:boolean;media?:Media[];outcomes?:Outcome[];nextNode?:string}
-export interface Runbook {schemaVersion:1;id:string;title:string;description:string;category:string;tags:string[];requirements?:string[];operatingSystems?:string[];metadata?:{author?:string;version?:string;updatedAt?:string};startNode:string;nodes:RunbookNode[]}
+export type Language='es'|'en';
+export type LocalizedString=string|Partial<Record<Language,string>>;
+export type NodeType='question'|'action'|'command'|'check'|'warning'|'solution'|'troubleshooting'|'visual-identification'|'note'|'multimedia';
+export interface Media {type:'image'|'video';url:string;alt:LocalizedString;caption?:LocalizedString}
+export interface Outcome {id:string;label:LocalizedString;nextNode?:string;description?:LocalizedString;media?:Media[]}
+export interface RunbookNode {
+ id:string;
+ type:NodeType;
+ title:LocalizedString;
+ body?:LocalizedString;
+ os?:string[];
+ command?:string;
+ expectedResult?:LocalizedString;
+ destructive?:boolean;
+ media?:Media[];
+ outcomes?:Outcome[];
+ nextNode?:string;
+ symptoms?:LocalizedString[];
+ errorMessages?:string[];
+ aliases?:LocalizedString[];
+ keywords?:string[];
+ tags?:string[];
+ cause?:LocalizedString;
+ finalSolution?:LocalizedString;
+}
+export interface Runbook {
+ schemaVersion:1|2;
+ id:string;
+ title:LocalizedString;
+ description:LocalizedString;
+ category:string;
+ tags:string[];
+ requirements?:LocalizedString[];
+ operatingSystems?:string[];
+ metadata?:{author?:string;version?:string;updatedAt?:string;createdFrom?:string};
+ startNode:string;
+ nodes:RunbookNode[];
+}

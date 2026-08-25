@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 2,
+  "id": "vite-command-not-found-example",
+  "title": {
+    "es": "Vite no se reconoce",
+    "en": "Vite command not found"
+  },
+  "description": {
+    "es": "Soluciona el error de Vite cuando faltan dependencias locales o Node/npm no estan disponibles.",
+    "en": "Fix the Vite error when local dependencies are missing or Node/npm are unavailable."
+  },
+  "category": "Troubleshooting",
+  "tags": ["Vite", "npm", "Node.js"],
+  "metadata": {
+    "author": "Tech Runbook",
+    "version": "1.0.0",
+    "updatedAt": "2026-08-25T00:00:00Z"
+  },
+  "startNode": "vite-command-not-found",
+  "nodes": [
+    {
+      "id": "vite-command-not-found",
+      "type": "troubleshooting",
+      "title": {
+        "es": "Vite no se reconoce",
+        "en": "Vite command not found"
+      },
+      "body": {
+        "es": "Normalmente faltan dependencias locales. Comprueba Node/npm e instala paquetes antes de arrancar Vite.",
+        "en": "Local dependencies are usually missing. Check Node/npm and install packages before starting Vite."
+      },
+      "symptoms": [
+        {
+          "es": "npm run dev no funciona",
+          "en": "npm run dev does not work"
+        }
+      ],
+      "errorMessages": [
+        "vite is not recognized as an internal or external command",
+        "'vite' is not recognized",
+        "vite: command not found"
+      ],
+      "aliases": [
+        {
+          "es": "vite no existe",
+          "en": "vite does not exist"
+        }
+      ],
+      "keywords": ["vite", "npm", "dependencies", "node_modules"],
+      "tags": ["Vite", "npm"],
+      "command": "node -v\nnpm -v\nnpm install\nnpm run dev",
+      "expectedResult": {
+        "es": "Vite muestra una URL local.",
+        "en": "Vite prints a local URL."
+      },
+      "outcomes": [
+        {
+          "id": "works",
+          "label": {
+            "es": "Funciona",
+            "en": "Works"
+          },
+          "nextNode": "solved"
+        },
+        {
+          "id": "forbidden",
+          "label": {
+            "es": "npm install devuelve 403 Forbidden",
+            "en": "npm install returns 403 Forbidden"
+          },
+          "nextNode": "npm-403"
+        }
+      ]
+    },
+    {
+      "id": "npm-403",
+      "type": "troubleshooting",
+      "title": {
+        "es": "npm install devuelve 403 Forbidden",
+        "en": "npm install returns 403 Forbidden"
+      },
+      "errorMessages": ["403 Forbidden npm install", "npm ERR! 403"],
+      "keywords": ["npm", "registry", "403", "forbidden"],
+      "command": "npm config get registry\nnpm config set registry https://registry.npmjs.org/\nnpm install\nnpm run dev",
+      "expectedResult": {
+        "es": "npm instala dependencias desde el registry publico.",
+        "en": "npm installs dependencies from the public registry."
+      },
+      "outcomes": [
+        {
+          "id": "works",
+          "label": {
+            "es": "Funciona",
+            "en": "Works"
+          },
+          "nextNode": "solved"
+        }
+      ]
+    },
+    {
+      "id": "solved",
+      "type": "solution",
+      "title": {
+        "es": "Solucionado",
+        "en": "Solved"
+      },
+      "body": {
+        "es": "La app arranca con npm run dev despues de instalar dependencias.",
+        "en": "The app starts with npm run dev after installing dependencies."
+      },
+      "finalSolution": {
+        "es": "Usar el servidor de desarrollo del proyecto y reparar dependencias/registry cuando sea necesario.",
+        "en": "Use the project development server and repair dependencies/registry when needed."
+      }
+    }
+  ]
+}
