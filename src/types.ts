@@ -1,7 +1,8 @@
 export type Language='es'|'en';
 export type LocalizedString=string|Partial<Record<Language,string>>;
 export type NodeType='question'|'action'|'command'|'check'|'warning'|'solution'|'troubleshooting'|'visual-identification'|'note'|'multimedia';
-export interface Media {type:'image'|'video';url:string;alt:LocalizedString;caption?:LocalizedString}
+export type MediaType='image'|'video'|'youtube'|'link';
+export interface Media {type:MediaType;url:string;alt:LocalizedString;caption?:LocalizedString;description?:LocalizedString;title?:LocalizedString}
 export interface Outcome {id:string;label:LocalizedString;nextNode?:string;description?:LocalizedString;media?:Media[]}
 export interface RunbookNode {
  id:string;
@@ -31,6 +32,7 @@ export interface Runbook {
  description:LocalizedString;
  category:string;
  folder?:string;
+ folderId?:string;
  ui?:{layout?:'horizontal'|'vertical'};
  tags:string[];
  requirements?:LocalizedString[];

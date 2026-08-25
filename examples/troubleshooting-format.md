@@ -1,4 +1,4 @@
-# Tech Runbook troubleshooting JSON
+# HTDE troubleshooting JSON
 
 Import JSON files must contain one runbook with `schemaVersion: 2`.
 
@@ -25,5 +25,6 @@ Troubleshooting nodes can include these searchable fields:
 - `outcomes`: branches with `label` and optional `nextNode`.
 - `cause`: localized likely cause.
 - `finalSolution`: localized final resolution.
+- `media`: image, video, YouTube, or link attachments with caption and alt text.
 
 See [vite-command-not-found.json](./vite-command-not-found.json) for an importable example.

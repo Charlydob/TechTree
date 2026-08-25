@@ -6,7 +6,7 @@
  "category":"Development",
  "tags":["Vite","VS Code","Go Live","npm","Node.js"],
  "operatingSystems":["Windows","Linux","macOS"],
- "metadata":{"author":"Tech Runbook","version":"1.0.0","updatedAt":"2026-08-25T00:00:00Z"},
+ "metadata":{"author":"HTDE","version":"1.0.0","updatedAt":"2026-08-25T00:00:00Z"},
  "startNode":"problem",
  "nodes":[
   {"id":"problem","type":"troubleshooting","title":{"es":"Go Live no muestra correctamente la aplicacion","en":"Go Live does not show the app correctly"},"body":{"es":"Vamos a identificar si la app necesita un servidor de desarrollo propio en vez de Live Server.","en":"Let's identify whether the app needs its own development server instead of Live Server."},"symptoms":[{"es":"Go Live no funciona","en":"Go Live does not work"},{"es":"La aplicacion web no se ve","en":"The web app is not visible"},{"es":"Pantalla en blanco con Live Server","en":"Blank screen with Live Server"}],"aliases":[{"es":"Go Live no muestra mi aplicacion","en":"Go Live does not show my app"},{"es":"Live Server no carga Vite","en":"Live Server does not load Vite"}],"keywords":["go live","live server","vite","vscode","web app","localhost"],"tags":["Vite","VS Code","Development"],"outcomes":[{"id":"vite","label":{"es":"Es una aplicacion Vite","en":"It is a Vite app"},"nextNode":"vite-explain"},{"id":"not-vite","label":{"es":"No es Vite","en":"It is not Vite"},"nextNode":"not-vite"},{"id":"unknown","label":{"es":"No lo se","en":"I don't know"},"nextNode":"check-vite-files"}]},

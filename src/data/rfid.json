@@ -7,7 +7,7 @@
  "tags":["RFID","NFC","USB","PC/SC","network"],
  "requirements":[{"es":"Una credencial de prueba conocida","en":"A known test credential"},{"es":"Acceso al host sin alterar la configuracion de produccion","en":"Access to the host without altering production configuration"}],
  "operatingSystems":["Windows","Linux","macOS"],
- "metadata":{"author":"Tech Runbook","version":"2.0.0","updatedAt":"2026-08-25T00:00:00Z"},
+ "metadata":{"author":"HTDE","version":"2.0.0","updatedAt":"2026-08-25T00:00:00Z"},
  "startNode":"safety",
  "nodes":[
   {"id":"safety","type":"warning","title":{"es":"Protege el sistema de produccion","en":"Protect the production system"},"body":{"es":"No cambies ajustes del lector, controlador, credencial ni produccion hasta conocer el sistema y el camino de rollback.","en":"Do not change reader, controller, credential or production settings until the system and rollback path are known."},"nextNode":"identify-reader"},

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://tech-runbook.local/schema/runbook-v2.json",
-  "title": "Tech Runbook v2",
+  "$id": "https://htde.local/schema/runbook-v2.json",
+  "title": "HTDE Runbook v2",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "id", "title", "description", "category", "tags", "startNode", "nodes"],
@@ -12,6 +12,7 @@
     "description": {"$ref": "#/$defs/localizedString"},
     "category": {"type": "string", "minLength": 1},
     "folder": {"type": "string"},
+    "folderId": {"type": "string"},
     "ui": {
       "type": "object",
       "additionalProperties": false,
@@ -55,10 +56,12 @@
       "additionalProperties": false,
       "required": ["type", "url", "alt"],
       "properties": {
-        "type": {"enum": ["image", "video"]},
+        "type": {"enum": ["image", "video", "youtube", "link"]},
         "url": {"type": "string", "minLength": 1},
         "alt": {"$ref": "#/$defs/localizedString"},
-        "caption": {"$ref": "#/$defs/localizedString"}
+        "caption": {"$ref": "#/$defs/localizedString"},
+        "description": {"$ref": "#/$defs/localizedString"},
+        "title": {"$ref": "#/$defs/localizedString"}
       }
     },
     "outcome": {
