@@ -176,22 +176,29 @@ main{max-width:1180px;margin:auto;padding:32px 20px}
 
 .compact-hero{grid-template-columns:minmax(0,1fr);padding:18px 0 12px}
 .compact-hero h1{font-size:clamp(28px,4vw,46px)}
-.dashboard-grid{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
+.dashboard-grid{display:grid;grid-template-columns:220px minmax(0,1fr);gap:18px;align-items:start}
 .folder-rail,.library-panel{min-width:0}
-.folder-rail{position:sticky;top:88px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);padding:12px}
+.folder-rail{position:sticky;top:88px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);padding:12px;overflow:hidden}
 .rail-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
-.rail-head button.active,.folder-row.active>button{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface));color:var(--text)}
+.rail-head button.active,.folder-row.active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface));color:var(--text)}
 .folder-create{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:12px}
 .folder-create button{font-size:13px;min-height:38px;padding:7px 9px}
-.folder-list{display:grid;gap:7px}
-.folder-node{display:grid;gap:6px;margin-left:calc(var(--depth,0) * 16px)}
-.folder-row{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:6px;align-items:center}
+.folder-list{display:grid;gap:7px;min-width:0}
+.folder-node{display:grid;gap:6px;min-width:0;margin-left:calc(var(--depth,0) * 16px)}
+.folder-row{display:grid;grid-template-columns:18px minmax(0,1fr);gap:6px;align-items:start;min-width:0;border:1px solid transparent;border-radius:var(--radius);padding:6px}
+.folder-row:hover{border-color:var(--border);background:var(--surface-2)}
+.folder-row:not(:has(.folder-toggle svg)){grid-template-columns:minmax(0,1fr)}
+.folder-row:not(:has(.folder-toggle svg)) .folder-toggle{display:none}
+.folder-row:not(:has(.folder-toggle svg))>div{grid-column:1}
 .folder-root{width:100%;justify-content:flex-start}
-.folder-toggle{width:34px;min-height:34px;padding:0}
-.folder-select{text-align:left;display:grid;gap:2px;min-height:48px;padding:8px 10px;justify-items:start}
-.folder-row small{color:var(--muted);font-weight:600}
-.folder-row>div{display:flex;gap:4px}
-.folder-row>div button{width:34px;min-height:34px;padding:0}
+.folder-toggle{width:18px;min-width:18px;min-height:36px;padding:0;border:0;background:transparent;color:var(--muted)}
+.folder-toggle:hover{border-color:transparent;background:transparent;color:var(--accent)}
+.folder-select{width:100%;min-width:0;text-align:left;display:grid;gap:2px;min-height:36px;padding:0;justify-content:stretch;justify-items:start;overflow:hidden;border:0;background:transparent}
+.folder-select:hover{border-color:transparent;background:transparent}
+.folder-select span{max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder-row small{max-width:100%;color:var(--muted);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder-row>div{grid-column:2;display:flex;flex-wrap:wrap;gap:4px;min-width:0;margin-top:2px}
+.folder-row>div button{width:34px;min-width:34px;min-height:34px;padding:0}
 .library-panel>.toolbar{margin-top:0}
 .tag-strip,.horizontal-tags{display:flex;gap:7px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:5px;scrollbar-width:thin}
 .tag-chip{white-space:nowrap;flex:0 0 auto}
@@ -293,7 +300,15 @@ main{max-width:1180px;margin:auto;padding:32px 20px}
  .dashboard-grid{gap:10px}
  .folder-rail{padding:10px}
  .folder-create{grid-template-columns:1fr auto}
+ .folder-create>*{min-width:0}
  .folder-create button{white-space:nowrap}
+ .folder-list{grid-template-columns:1fr}
+ .folder-node{margin-left:min(calc(var(--depth,0) * 14px),28px)}
+ .folder-row{grid-template-columns:36px minmax(0,1fr);align-items:start;gap:6px}
+ .folder-toggle{width:36px;min-width:36px;min-height:44px}
+ .folder-select{grid-template-columns:minmax(0,1fr) auto;column-gap:8px;row-gap:2px;min-height:44px;padding:7px 9px;align-items:center}
+ .folder-row>div{grid-column:2;display:flex;flex-wrap:wrap;gap:6px}
+ .folder-row>div button{width:44px;min-width:44px;min-height:44px}
  .workflow-card{padding:8px 9px}
  .workflow-main{grid-template-columns:1fr;gap:8px}
  .workflow-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
