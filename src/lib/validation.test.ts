@@ -1,0 +1,2 @@
+import {describe,expect,it} from 'vitest'; import rfid from '../data/rfid.json'; import {validateRunbook} from './validation';
+describe('runbook validation',()=>{it('accepts the bundled RFID runbook',()=>expect(validateRunbook(rfid).valid).toBe(true));it('reports a broken reference',()=>{const bad=structuredClone(rfid);bad.nodes[0].nextNode='missing';expect(validateRunbook(bad).errors.join(' ')).toContain('reference “missing”')});it('handles arbitrary JSON',()=>expect(validateRunbook({schemaVersion:1}).valid).toBe(false))});
