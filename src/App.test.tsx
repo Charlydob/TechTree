@@ -145,4 +145,37 @@ describe('App sync',()=>{
   fireEvent.click(screen.getByText('Cancelar'));
   expect(localStorage.getItem('tech-runbook.draft.rfid-integration')).toBeNull();
  });
+
+ it('uploads image media and saves only the returned URL in the runbook',async()=>{
+  const source=structuredClone(rfid) as Runbook;
+  let savedBody:unknown;
+  vi.stubGlobal('fetch',vi.fn(async (input:RequestInfo|URL,init?:RequestInit)=>{
+   const url=String(input);
+   if(url.endsWith('/sync'))return jsonResponse({runbooks:[stored(source)],folders:[]});
+   if(url.endsWith('/uploads')&&init?.method==='POST')return jsonResponse({url:'/uploads/mobile-photo.jpg',type:'image',filename:'mobile photo.jpg',size:4},201);
+   if(url.endsWith('/runbooks/rfid-integration')&&init?.method==='PUT'){
+    savedBody=JSON.parse(String(init.body));
+    return jsonResponse(stored((savedBody as {runbook:Runbook}).runbook,2));
+   }
+   throw new Error(`Unexpected request ${init?.method??'GET'} ${url}`);
+  }));
+
+  const {container}=render(<App/>);
+  await waitFor(()=>expect(container.querySelectorAll('.workflow-card')).toHaveLength(1));
+  const editButton=container.querySelector('.workflow-actions button[title="Modificar este procedimiento."]') as HTMLButtonElement;
+  fireEvent.click(editButton);
+  await screen.findByText('EDITOR VISUAL HTDE');
+  fireEvent.click(container.querySelector('.media-head button') as HTMLButtonElement);
+  await screen.findByRole('heading',{name:'Anadir multimedia'});
+  const cameraInput=container.querySelector('.media-source-row input[capture]') as HTMLInputElement;
+  fireEvent.change(cameraInput,{target:{files:[new File(['jpeg'],'photo.jpg',{type:'image/jpeg'})]}});
+  await screen.findByDisplayValue('/uploads/mobile-photo.jpg');
+  fireEvent.click(screen.getByText('Crear'));
+  fireEvent.click(container.querySelector('button[title="Guardar"]') as HTMLButtonElement);
+
+  await waitFor(()=>expect(savedBody).toBeTruthy());
+  const media=(savedBody as {runbook:Runbook}).runbook.nodes[0].media;
+  expect(media?.[0]).toMatchObject({type:'image',url:'/uploads/mobile-photo.jpg'});
+  expect(JSON.stringify(media)).not.toContain('data:');
+ });
 });

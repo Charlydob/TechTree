@@ -1,5 +1,9 @@
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import express,{type ErrorRequestHandler} from 'express';
 import cookieParser from 'cookie-parser';
+import multer from 'multer';
 import {clearSessionCookie,isAuthenticated,passwordMatches,requireAuth,setSessionCookie} from './auth';
 import {ConflictError,NotFoundError,type RunbookStore} from './types';
 import {assertRunbookId,assertValidRunbook} from './validation/runbookValidation';
@@ -13,7 +17,22 @@ interface AppOptions {
  sessionSecret:string;
  secureCookies?:boolean;
  jsonLimit?:string;
+ uploadDir?:string;
+ maxImageBytes?:number;
+ maxVideoBytes?:number;
 }
+
+const imageMimes=new Set(['image/jpeg','image/png','image/webp','image/heic']);
+const videoMimes=new Set(['video/mp4','video/quicktime','video/webm']);
+const mimeExtensions:Record<string,string>={
+ 'image/jpeg':'.jpg',
+ 'image/png':'.png',
+ 'image/webp':'.webp',
+ 'image/heic':'.heic',
+ 'video/mp4':'.mp4',
+ 'video/quicktime':'.mov',
+ 'video/webm':'.webm',
+};
 
 function validationError(message:string){
  const error=new Error(message);
@@ -50,7 +69,17 @@ function validateFolders(value:unknown):FolderItem[]{
  return value as FolderItem[];
 }
 
-export function createApp({store,appPassword,sessionSecret,secureCookies=process.env.NODE_ENV==='production',jsonLimit='2mb'}:AppOptions){
+function safeFilename(value:string){
+ return path.basename(value).replace(/[^\w.\- ]+/g,'').trim().slice(0,120)||'upload';
+}
+
+function mediaKind(mime:string){
+ if(imageMimes.has(mime))return 'image';
+ if(videoMimes.has(mime))return 'video';
+ return undefined;
+}
+
+export function createApp({store,appPassword,sessionSecret,secureCookies=process.env.NODE_ENV==='production',jsonLimit='2mb',uploadDir=process.env.UPLOAD_DIR??'/opt/TechTree/uploads',maxImageBytes=Number(process.env.MAX_IMAGE_UPLOAD_BYTES??15*1024*1024),maxVideoBytes=Number(process.env.MAX_VIDEO_UPLOAD_BYTES??200*1024*1024)}:AppOptions){
  const app=express();
  const clients=new Set<express.Response>();
  let revision=0;
@@ -60,6 +89,32 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
   for(const client of clients)client.write(data);
  };
  app.disable('x-powered-by');
+ fs.mkdirSync(uploadDir,{recursive:true});
+ const upload=multer({
+  storage:multer.diskStorage({
+   destination:(_request,_file,callback)=>callback(null,uploadDir),
+   filename:(_request,file,callback)=>{
+    const extension=mimeExtensions[file.mimetype];
+    callback(null,`${crypto.randomUUID()}${extension}`);
+   },
+  }),
+  limits:{fileSize:Math.max(maxImageBytes,maxVideoBytes),files:1},
+  fileFilter:(_request,file,callback)=>{
+   if(!mediaKind(file.mimetype))return callback(validationError('Unsupported upload MIME type.'));
+   callback(null,true);
+  },
+ });
+
+ app.use('/uploads',express.static(uploadDir,{
+  fallthrough:false,
+  index:false,
+  dotfiles:'deny',
+  setHeaders(response){
+   response.setHeader('X-Content-Type-Options','nosniff');
+   response.setHeader('Cache-Control','public, max-age=31536000, immutable');
+  },
+ }));
+
  app.use(express.json({limit:jsonLimit}));
  app.use(cookieParser());
 
@@ -89,6 +144,29 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
  });
 
  app.use('/api',requireAuth(sessionSecret));
+
+ app.post('/api/uploads',upload.single('file'),(request,response,next)=>{
+  try{
+   const file=request.file;
+   if(!file)throw validationError('file is required');
+   const type=mediaKind(file.mimetype);
+   if(!type)throw validationError('Unsupported upload MIME type.');
+   const maxBytes=type==='image'?maxImageBytes:maxVideoBytes;
+   if(file.size>maxBytes){
+    fs.unlink(file.path,()=>undefined);
+    return response.status(413).json({error:'payload_too_large',message:`${type} upload is too large.`});
+   }
+   response.status(201).json({
+    url:`/uploads/${file.filename}`,
+    type,
+    filename:safeFilename(file.originalname),
+    size:file.size,
+    mime:file.mimetype,
+   });
+  }catch(error){
+   next(error);
+  }
+ });
 
  app.get('/api/events',(request,response)=>{
   response.setHeader('Content-Type','text/event-stream');
@@ -234,6 +312,10 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
 
  const errorHandler:ErrorRequestHandler=(error,_request,response,_next)=>{
   void _next;
+  if(error instanceof multer.MulterError){
+   if(error.code==='LIMIT_FILE_SIZE')return response.status(413).json({error:'payload_too_large',message:'Uploaded file is too large.'});
+   return response.status(400).json({error:'upload_error',message:error.message});
+  }
   if(error instanceof ConflictError)return response.status(409).json({error:'conflict',message:error.message});
   if(error instanceof NotFoundError)return response.status(404).json({error:'not_found',message:error.message});
   if(error?.name==='ValidationError')return response.status(400).json({error:'validation_error',message:error.message});

@@ -21,6 +21,9 @@ APP_PASSWORD=
 SESSION_SECRET=
 PORT=3003
 NODE_ENV=production
+UPLOAD_DIR=/opt/TechTree/uploads
+MAX_IMAGE_UPLOAD_BYTES=15728640
+MAX_VIDEO_UPLOAD_BYTES=209715200
 ```
 
 Do not put real secrets in Git. Use `.env.example` as a template.
@@ -42,6 +45,8 @@ GET    /api/folders
 PUT    /api/folders
 GET    /api/sync
 POST   /api/sync/push
+POST   /api/uploads
+GET    /uploads/*
 ```
 
 ## Development and checks
@@ -60,7 +65,7 @@ npm run build
 
 Use `src/runbook.schema.json`. IDs are lowercase kebab-case and unique. Every `nextNode` references a node in the same file. Unknown properties are rejected, producing field-level import errors. Valid imports show a preview; matching IDs are explicitly replaced. Export emits the edited version.
 
-Folders are stored as paths in `folder`, for example `Servidores/Docker/Deployments`, so existing import/export remains portable. Node positions stay in `node.ui`. Any node can include multimedia items: `image`, `video`, `youtube`, or `link`, with URL, alt text, captions, titles, and descriptions.
+Folders are stored as paths in `folder`, for example `Servidores/Docker/Deployments`, so existing import/export remains portable. Node positions stay in `node.ui`. Any node can include multimedia items: `image`, `video`, `youtube`, or `link`, with URL, alt text, captions, titles, and descriptions. Uploaded images/videos are stored on the backend volume and the runbook JSON keeps only the returned `/uploads/...` URL.
 
 ## Database
 
@@ -83,6 +88,8 @@ frontend: 127.0.0.1:8080 -> container 80
 backend:  127.0.0.1:3003 -> container 3003
 ```
 
+Uploads are persisted in the Docker volume `techtree_uploads`, mounted at `UPLOAD_DIR` inside the backend container. The compose file still connects the backend to the external PostgreSQL network `charly-stack_default`; do not remove that network in deployment overrides.
+
 Caddy should keep the public URL the same and split routes:
 
 ```caddyfile
@@ -90,6 +97,10 @@ techtree.example.com {
   encode zstd gzip
 
   handle /api/* {
+    reverse_proxy 127.0.0.1:3003
+  }
+
+  handle /uploads/* {
     reverse_proxy 127.0.0.1:3003
   }
 
@@ -108,7 +119,8 @@ The same block is saved in `deploy/Caddyfile.example`.
 3. Open the app and sign in with `APP_PASSWORD`.
 4. If the browser has old local-only runbooks, accept the migration prompt: "Hay procedimientos guardados unicamente en este dispositivo. Quieres subirlos al servidor?"
 5. Confirm `/api/health` returns `{"ok":true,"postgres":true}`.
-6. Check Ajustes for the current `Version: YYYY.MM.DD-<hash>`.
+6. Upload a small image from a mobile editor and confirm the media URL starts with `/uploads/`.
+7. Check Ajustes for the current `Version: YYYY.MM.DD-<hash>`.
 
 Local runbooks are not deleted after migration. They remain as cache/fallback until server sync confirms writes.
 

@@ -23,14 +23,20 @@ import {
 import {
  ArrowDownToDot,
  ArrowUpFromDot,
+ Camera,
+ ChevronLeft,
  CircleHelp,
  Copy,
  Download,
  Edit3,
  FileJson,
+ FileUp,
+ Folder,
  FolderPlus,
  GitBranchPlus,
+ Home,
  Link as LinkIcon,
+ List,
  Maximize,
  MoreVertical,
  Moon,
@@ -41,6 +47,7 @@ import {
  Save,
  Scissors,
  Search,
+ Settings,
  Sun,
  Trash2,
  Unlink,
@@ -78,6 +85,7 @@ import {validateRunbook} from './lib/validation';
 
 type Mode='library'|'run'|'edit';
 type EditorView='diagram'|'cards';
+type MobileView='home'|'folders'|'search'|'settings'|'workflow'|'editor'|'diagram';
 type SearchResult={book:Runbook;node?:RunbookNode;score:number;snippet:string;path:string};
 type DraftNodeField='symptoms'|'aliases';
 type FolderCreateIntent={parentId?:string};
@@ -89,6 +97,7 @@ type ImportFailureIntent={runbook:Runbook;message:string;serverRunbook?:Runbook;
 type FlowLink={source:string;target:string;label:string;outcomeId?:string};
 type SelectedEdge={sourceId:string;targetId:string;outcomeId?:string;label:string};
 type NodePickerIntent={mode:'loose'}|{mode:'linked';sourceId:string;outcomeId?:string};
+type MobileConnectIntent={kind:'previous';targetId:string}|{kind:'next';sourceId:string}|{kind:'outcome';sourceId:string;outcomeId:string};
 type OutcomeIntent={sourceId:string;outcome?:Outcome;index?:number};
 type FlowNodeData={
  node:RunbookNode;
@@ -126,7 +135,7 @@ const ui={
   editorTitle:'EDITOR VISUAL HTDE',title:'Titulo',description:'Descripcion',nodeId:'ID del nodo',type:'Tipo',body:'Descripcion',command:'Comando',expectedResult:'Resultado esperado',destructive:'Potencialmente destructivo',outcomes:'Opciones / ramas',defaultNext:'Siguiente paso por defecto',validate:'Validar guia',valid:'Estructura valida',issues:'Problemas encontrados',tree:'Diagrama',cards:'Tarjetas',node:'Nodo',addNode:'Nodo aislado',delete:'Eliminar',reset:'Reset layout',save:'Guardar',undo:'Deshacer',redo:'Rehacer',quickBuild:'Acciones rapidas',addNext:'Siguiente paso',addAlternative:'Alternativa',addOutcome:'Anadir opcion / rama',markAsSolution:'Solucion',addCommand:'Comando',addObservedError:'Error',
   newGuide:'Nueva guia',guideName:'Nombre',firstNode:'Primer nodo',languageSeed:'Idioma inicial',create:'Crear',solutionEditor:'Nueva solucion',errorProblem:'Error/problema',variants:'Variantes del error',possibleCause:'Posible causa',step:'Paso',optionalCommand:'Comando opcional',finalSolution:'Solucion final',saveInLibrary:'Guardar en biblioteca',warnings:'Avisos',errors:'Errores',missingNode:'Nodo no encontrado',none:'Ninguno',end:'Fin',mobileSearch:'Buscar',nodeOpen:'Abrir nodo',symptoms:'Sintomas',errorMessages:'Mensajes de error',aliases:'Alias',keywords:'Palabras clave',warning:'Advertencia',verifyBeforeRunning:'verifica antes de ejecutar',oneStepPerLine:'Un paso por linea',
   folders:'Carpetas',newFolder:'+ Nueva carpeta',newSubfolder:'+ Nueva subcarpeta',folder:'Carpeta',allFolders:'Todas',noFolder:'Sin carpeta',rename:'Renombrar',moveFolder:'Mover carpeta',deleteFolder:'Eliminar carpeta',deleteFolderTitle:'Eliminar carpeta',moveToNoFolder:'Mover guias a Sin carpeta',deleteFolderAndContent:'Eliminar carpeta y contenido',collapsedHint:'Toca para expandir',siteLabel:'En el sitio',menu:'Menu',metadata:'Metadata',move:'Mover',deleteGuide:'Eliminar guia',insertStep:'Insertar paso',insertBefore:'Insertar antes',insertAfter:'Insertar despues',autoLayout:'Organizar automaticamente',fitView:'Fit view',center:'Center',visualOnly:'Movimiento visual: no cambia conexiones.',yes:'Si',no:'No',
-  disconnect:'Desconectar',changeTarget:'Cambiar destino',selectedConnection:'Conexion seleccionada',globalNodeHelp:'Las acciones globales crean nodos aislados.',manualConnect:'Arrastra desde un handle para conectar.',branchHelp:'Cada opcion representa un posible resultado y puede conducir a un paso diferente.',nodeOutcomeHelp:'Nodo = paso/pregunta/accion. Opcion = rama que sale de un nodo.',createNextNode:'Crear siguiente nodo',multimedia:'Multimedia',image:'Imagen',video:'Video',youtube:'YouTube',link:'Enlace',url:'URL',caption:'Caption',alt:'Alt text',mediaTitle:'Titulo del medio',quickEdit:'Edicion rapida',close:'Cerrar',moveUp:'Subir',moveDown:'Bajar',basic:'Basico',flow:'Flujo',diagnostics:'Diagnostico',advanced:'Avanzado',addMedia:'Anadir multimedia',addBranch:'Anadir rama',editBranch:'Editar rama',addNodePrompt:'Que quieres anadir?',location:'Ubicacion',createFolderTitle:'Nueva carpeta',folderName:'Nombre',chooseType:'Elegir tipo',
+  disconnect:'Desconectar',changeTarget:'Cambiar destino',selectedConnection:'Conexion seleccionada',globalNodeHelp:'Las acciones globales crean nodos aislados.',manualConnect:'Arrastra desde un handle para conectar.',branchHelp:'Cada opcion representa un posible resultado y puede conducir a un paso diferente.',nodeOutcomeHelp:'Nodo = paso/pregunta/accion. Opcion = rama que sale de un nodo.',createNextNode:'Crear siguiente nodo',multimedia:'Multimedia',image:'Imagen',video:'Video',youtube:'YouTube',link:'Enlace',url:'URL',caption:'Caption',alt:'Alt text',mediaTitle:'Titulo del medio',quickEdit:'Edicion rapida',close:'Cerrar',moveUp:'Subir',moveDown:'Bajar',basic:'Basico',flow:'Flujo',diagnostics:'Diagnostico',advanced:'Avanzado',addMedia:'Anadir multimedia',addBranch:'Anadir rama',editBranch:'Editar rama',addNodePrompt:'Que quieres anadir?',location:'Ubicacion',createFolderTitle:'Nueva carpeta',folderName:'Nombre',chooseType:'Elegir tipo',workflowView:'Workflow',editorView:'Editor',diagramView:'Diagrama',nodeMap:'Mapa',previousNode:'Nodo anterior',nextNode:'Nodo siguiente',connectExisting:'Conectar existente',camera:'Camara',photoLibrary:'Fototeca',file:'Archivo',uploading:'Subiendo',viewDiagram:'Ver diagrama',backToWorkflow:'Workflow',backToLibrary:'Biblioteca',recentWorkflows:'Workflows recientes',
  },
  en:{
   library:'Library',run:'Run',edit:'Edit',onsite:'On Site',startOver:'Start over',back:'Back',importRunbook:'Import runbook',createGuide:'+ New guide',createTroubleshooting:'Create troubleshooting',search:'Search',settings:'Settings',home:'Home',add:'Add',version:'Version',newVersion:'A new version is available',updateApp:'Update',synced:'✅ Synced',saving:'⏳ Saving',offline:'📴 Offline',pending:'⚠️ Pending changes',syncError:'❌ Sync error',login:'Sign in',password:'Password',serverLogin:'Server access',migrateLocal:'There are procedures saved only on this device. Do you want to upload them to the server?',uploadLocal:'Upload to server',skip:'Not now',conflict:'This procedure was modified from another device.',loadServer:'Load server version',keepMine:'Keep my version',exportMine:'Export my version',
@@ -138,7 +147,7 @@ const ui={
   editorTitle:'HTDE VISUAL EDITOR',title:'Title',description:'Description',nodeId:'Node ID',type:'Type',body:'Description',command:'Command',expectedResult:'Expected result',destructive:'Potentially destructive',outcomes:'Options / branches',defaultNext:'Default next step',validate:'Validate guide',valid:'Structure valid',issues:'Issues found',tree:'Diagram',cards:'Cards',node:'Node',addNode:'Loose node',delete:'Delete',reset:'Reset layout',save:'Save',undo:'Undo',redo:'Redo',quickBuild:'Quick actions',addNext:'Next step',addAlternative:'Alternative',addOutcome:'Add option / branch',markAsSolution:'Solution',addCommand:'Command',addObservedError:'Error',
   newGuide:'New guide',guideName:'Name',firstNode:'First node',languageSeed:'Initial language',create:'Create',solutionEditor:'New solution',errorProblem:'Error/problem',variants:'Error variants',possibleCause:'Possible cause',step:'Step',optionalCommand:'Optional command',finalSolution:'Final solution',saveInLibrary:'Save in library',warnings:'Warnings',errors:'Errors',missingNode:'Missing node',none:'None',end:'End',mobileSearch:'Search',nodeOpen:'Open node',symptoms:'Symptoms',errorMessages:'Error messages',aliases:'Aliases',keywords:'Keywords',warning:'Warning',verifyBeforeRunning:'verify before running',oneStepPerLine:'One step per line',
   folders:'Folders',newFolder:'+ New folder',newSubfolder:'+ New subfolder',folder:'Folder',allFolders:'All',noFolder:'No folder',rename:'Rename',moveFolder:'Move folder',deleteFolder:'Delete folder',deleteFolderTitle:'Delete folder',moveToNoFolder:'Move guides to No folder',deleteFolderAndContent:'Delete folder and content',collapsedHint:'Tap to expand',siteLabel:'On site',menu:'Menu',metadata:'Metadata',move:'Move',deleteGuide:'Delete guide',insertStep:'Insert step',insertBefore:'Insert before',insertAfter:'Insert after',autoLayout:'Auto layout',fitView:'Fit view',center:'Center',visualOnly:'Visual move: connections stay unchanged.',yes:'Yes',no:'No',
-  disconnect:'Disconnect',changeTarget:'Change target',selectedConnection:'Selected connection',globalNodeHelp:'Global actions create loose nodes.',manualConnect:'Drag from a handle to connect.',branchHelp:'Each option represents a possible result and can lead to a different step.',nodeOutcomeHelp:'Node = step/question/action. Option = branch leaving a node.',createNextNode:'Create next node',multimedia:'Multimedia',image:'Image',video:'Video',youtube:'YouTube',link:'Link',url:'URL',caption:'Caption',alt:'Alt text',mediaTitle:'Media title',quickEdit:'Quick edit',close:'Close',moveUp:'Move up',moveDown:'Move down',basic:'Basic',flow:'Flow',diagnostics:'Diagnostics',advanced:'Advanced',addMedia:'Add media',addBranch:'Add branch',editBranch:'Edit branch',addNodePrompt:'What do you want to add?',location:'Location',createFolderTitle:'New folder',folderName:'Name',chooseType:'Choose type',
+  disconnect:'Disconnect',changeTarget:'Change target',selectedConnection:'Selected connection',globalNodeHelp:'Global actions create loose nodes.',manualConnect:'Drag from a handle to connect.',branchHelp:'Each option represents a possible result and can lead to a different step.',nodeOutcomeHelp:'Node = step/question/action. Option = branch leaving a node.',createNextNode:'Create next node',multimedia:'Multimedia',image:'Image',video:'Video',youtube:'YouTube',link:'Link',url:'URL',caption:'Caption',alt:'Alt text',mediaTitle:'Media title',quickEdit:'Quick edit',close:'Close',moveUp:'Move up',moveDown:'Move down',basic:'Basic',flow:'Flow',diagnostics:'Diagnostics',advanced:'Advanced',addMedia:'Add media',addBranch:'Add branch',editBranch:'Edit branch',addNodePrompt:'What do you want to add?',location:'Location',createFolderTitle:'New folder',folderName:'Name',chooseType:'Choose type',workflowView:'Workflow',editorView:'Editor',diagramView:'Diagram',nodeMap:'Map',previousNode:'Previous node',nextNode:'Next node',connectExisting:'Connect existing',camera:'Camera',photoLibrary:'Photo library',file:'File',uploading:'Uploading',viewDiagram:'View diagram',backToWorkflow:'Workflow',backToLibrary:'Library',recentWorkflows:'Recent workflows',
  },
 } satisfies Record<Language,Record<string,string>>;
 
@@ -164,6 +173,9 @@ export default function App(){
  const [selected,setSelected]=useState<string>();
  const [targetNode,setTargetNode]=useState<string>();
  const [mode,setMode]=useState<Mode>('library');
+ const [mobileView,setMobileView]=useState<MobileView>('home');
+ const [mobileFolderId,setMobileFolderId]=useState<string>();
+ const [mobileEditorNode,setMobileEditorNode]=useState<string>();
  const [site,setSite]=useState(false);
  const [search,setSearch]=useState('');
  const [tagFilter,setTagFilter]=useState('');
@@ -380,6 +392,39 @@ export default function App(){
    </div>
   </header>
 
+  <MobileShell
+   appMode={mode}
+   books={books}
+   folders={folders}
+   folderPaths={folderPaths}
+   selectedBook={book}
+   selectedId={selected}
+   view={mobileView}
+   setView={setMobileView}
+   currentFolderId={mobileFolderId}
+   setCurrentFolderId={setMobileFolderId}
+   editorNode={mobileEditorNode}
+   setEditorNode={setMobileEditorNode}
+   search={search}
+   setSearch={setSearch}
+   recents={recents}
+   lang={lang}
+   t={t}
+   buildVersion={buildVersion}
+   dark={dark}
+   setDark={setDark}
+   setLang={setLang}
+   openWorkflow={item=>{setSelected(item.id);setTargetNode(undefined);setMobileEditorNode(item.startNode);setMobileView('workflow');addRecent({bookId:item.id,type:'procedure',label:localize(item.title,lang)})}}
+   createGuide={()=>setCreating(true)}
+   importGuide={()=>setImporting(true)}
+   createFolder={parentId=>setFolderCreate({parentId})}
+   setFolderFromPath={setFolderFilter}
+   runWorkflow={item=>{setSite(false);open(item,'run')}}
+   editWorkflow={item=>{setSelected(item.id);setTargetNode(item.startNode);setMobileEditorNode(item.startNode);setMobileView('editor')}}
+   exportWorkflow={download}
+   saveBook={update}
+  />
+
   {mode==='library'&&<main className="home">
    <section className="hero compact-hero">
     <p className="eyebrow">HTDE</p>
@@ -458,8 +503,179 @@ export default function App(){
   {conflict&&<ConflictModal intent={conflict} t={t} close={()=>setConflict(undefined)} loadServer={async()=>{setConflict(undefined);await refreshFromServer()}} keepMine={forceSaveConflict} exportMine={()=>download(conflict.runbook)}/>}
   {importConflict&&<ImportConflictModal intent={importConflict} t={t} close={()=>setImportConflict(undefined)} replace={()=>replaceImported(importConflict.runbook)} copy={()=>copyImported(importConflict.runbook)}/>}
   {importFailure&&<ImportFailureModal intent={importFailure} t={t} close={()=>setImportFailure(undefined)} retry={()=>acceptBook(importFailure.runbook)} copy={()=>copyImported(importFailure.runbook)} replace={importFailure.serverRunbook?()=>replaceImported(importFailure.runbook):undefined} exportJson={()=>download(importFailure.runbook)}/>}
-  {updateAvailable&&<div className="update-toast" role="status"><span>{t.newVersion} -&gt;</span><button className="primary" onClick={()=>window.dispatchEvent(new CustomEvent('techtree:apply-update'))}>{t.updateApp}</button></div>}
+ {updateAvailable&&<div className="update-toast" role="status"><span>{t.newVersion} -&gt;</span><button className="primary" onClick={()=>window.dispatchEvent(new CustomEvent('techtree:apply-update'))}>{t.updateApp}</button></div>}
  </div>;
+}
+
+function MobileShell({appMode,books,folders,folderPaths,selectedBook,selectedId,view,setView,currentFolderId,setCurrentFolderId,editorNode,setEditorNode,search,setSearch,recents,lang,t,buildVersion,dark,setDark,setLang,openWorkflow,createGuide,importGuide,createFolder,setFolderFromPath,runWorkflow,editWorkflow,exportWorkflow,saveBook}:{appMode:Mode;books:Runbook[];folders:FolderItem[];folderPaths:Map<string,string>;selectedBook?:Runbook;selectedId?:string;view:MobileView;setView:(view:MobileView)=>void;currentFolderId?:string;setCurrentFolderId:(id?:string)=>void;editorNode?:string;setEditorNode:(id:string)=>void;search:string;setSearch:(value:string)=>void;recents:RecentItem[];lang:Language;t:Record<string,string>;buildVersion:string;dark:boolean;setDark:(value:(current:boolean)=>boolean)=>void;setLang:(lang:Language)=>void;openWorkflow:(book:Runbook)=>void;createGuide:()=>void;importGuide:()=>void;createFolder:(parentId?:string)=>void;setFolderFromPath:(path?:string)=>void;runWorkflow:(book:Runbook)=>void;editWorkflow:(book:Runbook)=>void;exportWorkflow:(book:Runbook)=>void;saveBook:(book:Runbook)=>void}){
+ if(appMode!=='library')return null;
+ const recentBooks=Array.from(new Map(recents.map(item=>books.find(book=>book.id===item.bookId)).filter((book):book is Runbook=>Boolean(book)).map(book=>[book.id,book])).values()).slice(0,5);
+ const visibleRecent=recentBooks.length?recentBooks:books.slice(0,5);
+ const results=searchResults(books,search,'',lang);
+ const openBook=(book:Runbook)=>openWorkflow(book);
+ return <main className="mobile-app-shell" aria-label="HTDE mobile">
+  {view==='home'&&<section className="mobile-view">
+   <label className="mobile-search-box"><Search size={17}/><input aria-label={t.search} placeholder={t.searchPlaceholder} value={search} onChange={event=>setSearch(event.target.value)} onFocus={()=>setView('search')}/></label>
+   <div className="mobile-section-head"><h2>{t.recentWorkflows}</h2><button className="primary mobile-create" onClick={createGuide}><Plus size={17}/></button></div>
+   <div className="mobile-list">{visibleRecent.map(book=><MobileWorkflowRow key={book.id} book={book} lang={lang} t={t} open={openBook}/>)}</div>
+  </section>}
+  {view==='folders'&&<MobileFolders books={books} folders={folders} folderPaths={folderPaths} currentFolderId={currentFolderId} setCurrentFolderId={setCurrentFolderId} lang={lang} t={t} openWorkflow={openBook} createFolder={createFolder} setFolderFromPath={setFolderFromPath}/>}
+  {view==='search'&&<section className="mobile-view">
+   <label className="mobile-search-box"><Search size={17}/><input aria-label={t.search} placeholder={t.searchPlaceholder} value={search} onChange={event=>setSearch(event.target.value)} autoFocus/></label>
+   <div className="mobile-list">{search.trim()?results.map(result=><button className="mobile-search-result" key={`${result.book.id}-${result.node?.id??'book'}`} onClick={()=>{openWorkflow(result.book);if(result.node)setEditorNode(result.node.id)}}><b>{localize(result.node?.title??result.book.title,lang)}</b><small>{result.path}</small><span>{result.snippet||localize(result.book.description,lang)}</span></button>):books.map(book=><MobileWorkflowRow key={book.id} book={book} lang={lang} t={t} open={openBook}/>)}</div>
+  </section>}
+  {view==='settings'&&<section className="mobile-view mobile-settings">
+   <h2>{t.settings}</h2>
+   <label>{t.language}<select value={lang} onChange={event=>setLang(event.target.value as Language)}><option value="es">{t.spanish}</option><option value="en">{t.english}</option></select></label>
+   <button onClick={()=>setDark(current=>!current)}>{dark?<Sun size={17}/>:<Moon size={17}/>} {t.toggleTheme}</button>
+   <div><span>{t.version}</span><code>{buildVersion}</code></div>
+   <button onClick={importGuide}><FileUp size={17}/> {t.importRunbook}</button>
+  </section>}
+  {view==='workflow'&&selectedBook&&<MobileWorkflow book={selectedBook} lang={lang} t={t} back={()=>setView('home')} run={runWorkflow} edit={editWorkflow} exportBook={exportWorkflow} setNode={setEditorNode} setView={setView}/>}
+  {view==='editor'&&selectedBook&&<MobileCardEditor key={`${selectedBook.id}-${selectedId}`} source={selectedBook} startAt={editorNode} lang={lang} t={t} back={()=>setView('workflow')} save={saveBook} openDiagram={()=>setView('diagram')} setExternalActive={setEditorNode}/>}
+  {view==='diagram'&&selectedBook&&<MobileDiagram source={selectedBook} active={editorNode??selectedBook.startNode} lang={lang} t={t} back={()=>setView('editor')} selectNode={id=>{setEditorNode(id);setView('editor')}}/>}
+  {['home','folders','search','settings'].includes(view)&&<nav className="mobile-bottom-nav" aria-label="Mobile"><button className={view==='home'?'active':''} onClick={()=>setView('home')}><Home size={18}/><span>{t.home}</span></button><button className={view==='folders'?'active':''} onClick={()=>setView('folders')}><Folder size={18}/><span>{t.folders}</span></button><button className={view==='search'?'active':''} onClick={()=>setView('search')}><Search size={18}/><span>{t.search}</span></button><button className={view==='settings'?'active':''} onClick={()=>setView('settings')}><Settings size={18}/><span>{t.settings}</span></button></nav>}
+ </main>;
+}
+
+function MobileWorkflowRow({book,lang,t,open}:{book:Runbook;lang:Language;t:Record<string,string>;open:(book:Runbook)=>void}){
+ return <button className="mobile-workflow-row" onClick={()=>open(book)}><span><b>{localize(book.title,lang)}</b><small>{folderLabel(folderOf(book),t)} · {book.nodes.length} {t.node}</small></span><span>-&gt;</span></button>;
+}
+
+function MobileFolders({books,folders,folderPaths,currentFolderId,setCurrentFolderId,lang,t,openWorkflow,createFolder,setFolderFromPath}:{books:Runbook[];folders:FolderItem[];folderPaths:Map<string,string>;currentFolderId?:string;setCurrentFolderId:(id?:string)=>void;lang:Language;t:Record<string,string>;openWorkflow:(book:Runbook)=>void;createFolder:(parentId?:string)=>void;setFolderFromPath:(path?:string)=>void}){
+ const currentPath=currentFolderId?folderPaths.get(currentFolderId)??'':undefined;
+ const children=folders.filter(folder=>folder.parentId===currentFolderId);
+ const shownBooks=books.filter(book=>folderOf(book)===(currentPath??uncategorized));
+ const trail:FolderItem[]=[];
+ let cursor=currentFolderId?folders.find(folder=>folder.id===currentFolderId):undefined;
+ while(cursor){trail.unshift(cursor);cursor=cursor.parentId?folders.find(folder=>folder.id===cursor?.parentId):undefined}
+ return <section className="mobile-view">
+  <div className="mobile-topbar"><button onClick={()=>{setCurrentFolderId(undefined);setFolderFromPath(undefined)}}><ChevronLeft size={17}/> {t.backToLibrary}</button><button className="primary" onClick={()=>createFolder(currentFolderId)}><Plus size={17}/></button></div>
+  <div className="mobile-breadcrumb">{trail.length?trail.map(folder=><button key={folder.id} onClick={()=>{setCurrentFolderId(folder.id);setFolderFromPath(folderPaths.get(folder.id))}}>{folder.name}</button>):<b>{t.folders}</b>}</div>
+  <div className="mobile-list">{children.map(folder=>{
+   const path=folderPaths.get(folder.id)??folder.name;
+   const count=books.filter(book=>{const current=folderOf(book);return current===path||current.startsWith(`${path}/`)}).length;
+   return <button className="mobile-folder-row" key={folder.id} onClick={()=>{setCurrentFolderId(folder.id);setFolderFromPath(path)}}><span><b>{folder.name}</b><small>{count} {t.procedures.toLowerCase()}</small></span><span>-&gt;</span></button>;
+  })}{shownBooks.map(book=><MobileWorkflowRow key={book.id} book={book} lang={lang} t={t} open={openWorkflow}/>)}</div>
+ </section>;
+}
+
+function MobileWorkflow({book,lang,t,back,run,edit,exportBook,setNode,setView}:{book:Runbook;lang:Language;t:Record<string,string>;back:()=>void;run:(book:Runbook)=>void;edit:(book:Runbook)=>void;exportBook:(book:Runbook)=>void;setNode:(id:string)=>void;setView:(view:MobileView)=>void}){
+ return <section className="mobile-view mobile-workflow-view">
+  <div className="mobile-topbar"><button onClick={back}><ChevronLeft size={17}/> {t.backToLibrary}</button><details className="overflow-menu"><summary aria-label={t.menu}>...</summary><div><button onClick={()=>exportBook(book)}>{t.exportJson}</button></div></details></div>
+  <p className="eyebrow">{t.workflowView}</p>
+  <h1>{localize(book.title,lang)}</h1>
+  <p>{localize(book.description,lang)}</p>
+  <div className="tags horizontal-tags">{book.tags.map(tag=><span className="tag-chip" key={tag}>{tag}</span>)}</div>
+  <div className="mobile-workflow-actions"><button className="primary" onClick={()=>run(book)}>{t.run}</button><button onClick={()=>edit(book)}><Edit3 size={17}/> {t.edit}</button><button onClick={()=>exportBook(book)}><Download size={17}/> {t.exportJson}</button><button onClick={()=>{setNode(book.startNode);setView('diagram')}}><Workflow size={17}/> {t.viewDiagram}</button></div>
+  <section className="mobile-node-summary"><h2>{t.nodeMap}</h2>{book.nodes.slice(0,12).map((node,index)=><button key={node.id} onClick={()=>{setNode(node.id);setView('editor')}}><span>{index+1}. {localize(node.title,lang)||node.id}</span><small>{node.type}</small></button>)}</section>
+ </section>;
+}
+
+function MobileCardEditor({source,startAt,lang,t,back,save,openDiagram,setExternalActive}:{source:Runbook;startAt?:string;lang:Language;t:Record<string,string>;back:()=>void;save:(book:Runbook)=>void;openDiagram:()=>void;setExternalActive:(id:string)=>void}){
+ const [book,setBook]=useState(()=>clone(source));
+ const [active,setActiveState]=useState(startAt&&getNode(source,startAt)?startAt:source.startNode);
+ const [connect,setConnect]=useState<MobileConnectIntent>();
+ const [outcomeIntent,setOutcomeIntent]=useState<OutcomeIntent>();
+ const [mapOpen,setMapOpen]=useState(false);
+ const activeNode=getNode(book,active)??book.nodes[0];
+ const ordered=useMemo(()=>orderedNodes(book),[book]);
+ const activeIndex=Math.max(0,ordered.findIndex(node=>node.id===activeNode?.id));
+ const setActive=(id:string)=>{setActiveState(id);setExternalActive(id)};
+ const mutate=(fn:(draft:Runbook)=>void)=>setBook(current=>{const next=clone(current);fn(next);return next});
+ const setText=(value:LocalizedString|undefined,nextValue:string):LocalizedString=>typeof value==='string'?{es:lang==='es'?nextValue:value,en:lang==='en'?nextValue:value}:{...value,[lang]:nextValue};
+ const uniqueNodeId=(title:string)=>{let id=slugify(title),i=2;while(book.nodes.some(node=>node.id===id))id=`${slugify(title)}-${i++}`;return id};
+ const makeNode=(type:NodeType,title=nodeTypeLabel(type,t)):RunbookNode=>({id:uniqueNodeId(title),type,title:localized(title,lang),body:localized('',lang),outcomes:type==='question'?[{id:'si',label:localized(t.yes,lang)},{id:'no',label:localized(t.no,lang)}]:[],command:type==='command'?'':undefined,errorMessages:type==='troubleshooting'?[]:undefined});
+ const incoming=activeNode?flowLinks(book).filter(link=>link.target===activeNode.id):[];
+ const createConnected=(intent:MobileConnectIntent,type:NodeType)=>{
+  const node=makeNode(type);
+  mutate(draft=>{
+   if(intent.kind==='previous'){
+    const target=getNode(draft,intent.targetId);if(!target)return;
+    node.nextNode=target.id;draft.nodes.push(node);draft.nodes.forEach(item=>{if(item.id!==node.id&&item.nextNode===target.id)item.nextNode=node.id;item.outcomes?.forEach(outcome=>{if(outcome.nextNode===target.id)outcome.nextNode=node.id})});if(draft.startNode===target.id)draft.startNode=node.id;
+   }else{
+    const sourceNode=getNode(draft,intent.sourceId);if(!sourceNode)return;
+    const outcome=intent.kind==='outcome'?sourceNode.outcomes?.find(item=>item.id===intent.outcomeId):undefined;
+    const oldTarget=outcome?outcome.nextNode:sourceNode.nextNode;
+    node.nextNode=oldTarget;draft.nodes.push(node);if(outcome)outcome.nextNode=node.id;else sourceNode.nextNode=node.id;
+   }
+  });
+  setConnect(undefined);setActive(node.id);
+ };
+ const connectExisting=(intent:MobileConnectIntent,targetId:string)=>{
+  mutate(draft=>{
+   if(intent.kind==='previous'){
+    const target=getNode(draft,intent.targetId);const previous=getNode(draft,targetId);if(!target||!previous||target.id===previous.id)return;previous.nextNode=target.id;if(draft.startNode===target.id)draft.startNode=previous.id;
+   }else{
+    const sourceNode=getNode(draft,intent.sourceId);if(!sourceNode||sourceNode.id===targetId)return;
+    if(intent.kind==='outcome'){const outcome=sourceNode.outcomes?.find(item=>item.id===intent.outcomeId);if(outcome)outcome.nextNode=targetId}else sourceNode.nextNode=targetId;
+   }
+  });
+  setConnect(undefined);setActive(targetId);
+ };
+ const disconnectNext=(sourceId:string,outcomeId?:string)=>mutate(draft=>{const sourceNode=getNode(draft,sourceId);if(!sourceNode)return;if(outcomeId){const outcome=sourceNode.outcomes?.find(item=>item.id===outcomeId);if(outcome)delete outcome.nextNode}else delete sourceNode.nextNode});
+ const applySave=()=>save({...book,metadata:{...book.metadata,updatedAt:new Date().toISOString()}});
+ if(!activeNode)return <section className="mobile-view"><button onClick={back}>{t.back}</button><p>{t.missingNode}</p></section>;
+ return <section className="mobile-view mobile-editor-view">
+  <div className="mobile-topbar"><button onClick={back}><ChevronLeft size={17}/> {t.backToWorkflow}</button><button onClick={()=>setMapOpen(true)}><List size={17}/> {t.nodeMap}</button><button className="primary" onClick={applySave}><Save size={17}/> {t.save}</button></div>
+  <div className="mobile-node-pager"><button disabled={activeIndex<1} onClick={()=>setActive(ordered[activeIndex-1].id)}>{'<-'}</button><span>{t.node} {activeIndex+1} de {ordered.length}</span><button disabled={activeIndex>=ordered.length-1} onClick={()=>setActive(ordered[activeIndex+1].id)}>{'->'}</button></div>
+  <MobileNodeCard node={activeNode} book={book} incoming={incoming} lang={lang} t={t} setText={setText} mutate={mutate} connect={setConnect} disconnectNext={disconnectNext} openOutcome={(outcome,index)=>setOutcomeIntent({sourceId:activeNode.id,outcome,index})}/>
+  <button className="mobile-diagram-button" onClick={openDiagram}><Workflow size={18}/> {t.viewDiagram}</button>
+  {connect&&<MobileConnectSheet intent={connect} nodes={book.nodes} activeId={activeNode.id} lang={lang} t={t} close={()=>setConnect(undefined)} createNode={type=>createConnected(connect,type)} connectExisting={id=>connectExisting(connect,id)}/>}
+  {outcomeIntent&&<OutcomeModal intent={outcomeIntent} nodes={book.nodes} lang={lang} t={t} close={()=>setOutcomeIntent(undefined)} save={(outcome,index)=>{mutate(draft=>{const sourceNode=getNode(draft,outcomeIntent.sourceId);if(!sourceNode)return;if(index!=null&&sourceNode.outcomes?.[index])sourceNode.outcomes[index]=outcome;else sourceNode.outcomes=[...(sourceNode.outcomes??[]),outcome]});setOutcomeIntent(undefined)}}/>}
+  {mapOpen&&<div className="modal mobile-node-map" role="dialog" aria-modal="true"><section><button className="close" onClick={()=>setMapOpen(false)}>x</button><h2>{t.nodeMap}</h2>{ordered.map((node,index)=><button key={node.id} className={node.id===active?'active':''} onClick={()=>{setActive(node.id);setMapOpen(false)}}>{index+1}. {localize(node.title,lang)||node.id}<small>{node.type}</small></button>)}</section></div>}
+ </section>;
+}
+
+function MobileNodeCard({node,book,incoming,lang,t,setText,mutate,connect,disconnectNext,openOutcome}:{node:RunbookNode;book:Runbook;incoming:FlowLink[];lang:Language;t:Record<string,string>;setText:(value:LocalizedString|undefined,nextValue:string)=>LocalizedString;mutate:(fn:(draft:Runbook)=>void)=>void;connect:(intent:MobileConnectIntent)=>void;disconnectNext:(sourceId:string,outcomeId?:string)=>void;openOutcome:(outcome?:Outcome,index?:number)=>void}){
+ const next=book.nodes.find(item=>item.id===node.nextNode);
+ return <article className="mobile-editor-card">
+  <div className="mobile-card-connector top"><button onClick={()=>connect({kind:'previous',targetId:node.id})}><Plus size={17}/> {t.previousNode}</button>{incoming[0]&&<small>{incoming[0].source}</small>}</div>
+  <p className="eyebrow">{node.type}</p>
+  <h1>{localize(node.title,lang)||t.node}</h1>
+  <details className="node-section" open><summary>{t.basic}</summary><NodeForm activeNode={node} book={book} lang={lang} t={t} mutate={mutate} setText={setText}/></details>
+  <details className="node-section" open={node.type==='troubleshooting'}><summary>{t.diagnostics}</summary>{node.type==='troubleshooting'?<TroubleshootingFields node={node} lang={lang} t={t} mutate={mutate} active={node.id} setText={setText}/>:<p className="muted-inline">{t.none}</p>}</details>
+  <details className="node-section" open><summary>{t.flow}</summary>
+   <div className="mobile-flow-line"><span>{t.nextNode}</span>{next?<><button onClick={()=>connect({kind:'next',sourceId:node.id})}>-&gt; {localize(next.title,lang)||next.id}</button><button className="danger" onClick={()=>disconnectNext(node.id)}><Unlink size={16}/></button></>:<button className="primary" onClick={()=>connect({kind:'next',sourceId:node.id})}><Plus size={17}/></button>}</div>
+   <div className="branch-list">{(node.outcomes??[]).map((outcome,index)=>{const target=book.nodes.find(item=>item.id===outcome.nextNode);return <div className="mobile-outcome-link" key={outcome.id}><button onClick={()=>openOutcome(outcome,index)}>{localize(outcome.label,lang)||t.addBranch}</button>{target?<><button onClick={()=>connect({kind:'outcome',sourceId:node.id,outcomeId:outcome.id})}>-&gt; {localize(target.title,lang)||target.id}</button><button className="danger" onClick={()=>disconnectNext(node.id,outcome.id)}><Unlink size={16}/></button></>:<button className="primary" onClick={()=>connect({kind:'outcome',sourceId:node.id,outcomeId:outcome.id})}><Plus size={17}/></button>}</div>})}</div>
+   <button onClick={()=>openOutcome()}><GitBranchPlus size={17}/> {t.addBranch}</button>
+  </details>
+  <details className="node-section" open={node.type==='command'}><summary>{t.command}</summary>{node.type==='command'||node.command!=null?<div className="form-grid"><label>{t.command}<textarea rows={3} value={node.command??''} onChange={event=>mutate(draft=>{getNode(draft,node.id)!.command=event.target.value})}/></label><Field label={t.expectedResult} value={localize(node.expectedResult,lang)} change={value=>mutate(draft=>{getNode(draft,node.id)!.expectedResult=setText(node.expectedResult,value)})}/><label className="check"><input type="checkbox" checked={node.destructive??false} onChange={event=>mutate(draft=>{getNode(draft,node.id)!.destructive=event.target.checked})}/> {t.destructive}</label></div>:<p className="muted-inline">{t.none}</p>}</details>
+  <details className="node-section" open={node.type==='multimedia'}><summary>{t.multimedia}</summary><MediaEditor media={node.media??[]} lang={lang} t={t} change={media=>mutate(draft=>{getNode(draft,node.id)!.media=media})}/></details>
+  <details className="node-section"><summary>{t.advanced}</summary><div className="form-grid"><Field label={t.keywords} value={(node.keywords??[]).join(', ')} change={value=>mutate(draft=>{getNode(draft,node.id)!.keywords=splitList(value)})}/><Field label={t.aliases} value={(node.aliases??[]).map(item=>localize(item,lang)).join(', ')} change={value=>mutate(draft=>{getNode(draft,node.id)!.aliases=splitList(value).map(item=>localized(item,lang))})}/><Field label={t.tags} value={(node.tags??[]).join(', ')} change={value=>mutate(draft=>{getNode(draft,node.id)!.tags=splitList(value)})}/></div></details>
+  <div className="mobile-card-connector bottom"><button onClick={()=>connect({kind:'next',sourceId:node.id})}><Plus size={17}/> {t.nextNode}</button></div>
+ </article>;
+}
+
+function MobileConnectSheet({intent,nodes,activeId,lang,t,close,createNode,connectExisting}:{intent:MobileConnectIntent;nodes:RunbookNode[];activeId:string;lang:Language;t:Record<string,string>;close:()=>void;createNode:(type:NodeType)=>void;connectExisting:(id:string)=>void}){
+ const [target,setTarget]=useState(nodes.find(node=>node.id!==activeId)?.id??'');
+ return <div className="modal mobile-bottom-sheet" role="dialog" aria-modal="true"><section className="compact-modal"><button className="close" onClick={close}>x</button><p className="eyebrow">{intent.kind==='previous'?t.previousNode:t.nextNode}</p><h2>{t.addNodePrompt}</h2><div className="node-type-grid">{nodeTypesList.map(type=><button key={type} onClick={()=>createNode(type)}><Plus size={15}/> {nodeTypeLabel(type,t)}</button>)}</div><label>{t.connectExisting}<select value={target} onChange={event=>setTarget(event.target.value)}>{nodes.filter(node=>node.id!==activeId).map(node=><option key={node.id} value={node.id}>{localize(node.title,lang)||node.id}</option>)}</select></label><button className="primary wide" disabled={!target} onClick={()=>connectExisting(target)}>{t.changeTarget}</button></section></div>;
+}
+
+function MobileDiagram({source,active,lang,t,back,selectNode}:{source:Runbook;active:string;lang:Language;t:Record<string,string>;back:()=>void;selectNode:(id:string)=>void}){
+ return <ReactFlowProvider><MobileDiagramInner source={source} active={active} lang={lang} t={t} back={back} selectNode={selectNode}/></ReactFlowProvider>;
+}
+
+function MobileDiagramInner({source,active,lang,t,back,selectNode}:{source:Runbook;active:string;lang:Language;t:Record<string,string>;back:()=>void;selectNode:(id:string)=>void}){
+ const nodeTypes=useMemo(()=>({runbook:FlowNodeCard}),[]);
+ const edgeTypes=useMemo(()=>({insert:InsertEdgeButton}),[]);
+ const {nodes,edges}=toFlowElements(source,active,undefined,lang,t,undefined,selectNode,()=>undefined,()=>undefined,()=>undefined,()=>undefined,()=>undefined);
+ return <section className="mobile-diagram-view"><div className="mobile-topbar"><button onClick={back}><ChevronLeft size={17}/> {t.editorView}</button></div><ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView minZoom={0.2} maxZoom={1.9} panOnDrag zoomOnPinch zoomOnScroll nodesDraggable={false} nodesConnectable={false} proOptions={{hideAttribution:true}}><Background gap={22}/><Controls showInteractive={false}/></ReactFlow></section>;
+}
+
+function orderedNodes(book:Runbook){
+ const result:RunbookNode[]=[];
+ const seen=new Set<string>();
+ const visit=(id?:string)=>{
+  const node=id?getNode(book,id):undefined;
+  if(!node||seen.has(node.id))return;
+  seen.add(node.id);result.push(node);
+  if(node.nextNode)visit(node.nextNode);
+  for(const outcome of node.outcomes??[])visit(outcome.nextNode);
+ };
+ visit(book.startNode);
+ for(const node of book.nodes)if(!seen.has(node.id))result.push(node);
+ return result;
 }
 
 function SyncIndicator({state,pending,message,lastSyncAt,realtimeActive,open,setOpen,t}:{state:SyncState;pending:number;message:string;lastSyncAt?:Date;realtimeActive:boolean;open:boolean;setOpen:(value:boolean)=>void;t:Record<string,string>}){
@@ -844,9 +1060,27 @@ function MediaEditor({media,lang,t,change}:{media:Media[];lang:Language;t:Record
 function MediaCreateModal({initial,lang,t,close,save}:{initial:Media;lang:Language;t:Record<string,string>;close:()=>void;save:(media:Media)=>void}){
  const [draft,setDraft]=useState(initial);
  const [error,setError]=useState('');
+ const [uploading,setUploading]=useState(false);
+ const cameraRef=useRef<HTMLInputElement>(null);
+ const libraryRef=useRef<HTMLInputElement>(null);
+ const fileRef=useRef<HTMLInputElement>(null);
  const localizedChange=(value:LocalizedString|undefined,nextValue:string):LocalizedString=>typeof value==='string'?{es:lang==='es'?nextValue:value,en:lang==='en'?nextValue:value}:{...value,[lang]:nextValue};
  const apply=()=>{if(!draft.url.trim()){setError(t.image===mediaTypeLabel(draft.type,t)?'Esta imagen necesita una URL.':'URL is required.');return}save({...draft,url:draft.url.trim()})};
- return <div className="modal" role="dialog" aria-modal="true"><section className="compact-modal"><button className="close" onClick={close}>x</button><p className="eyebrow">{t.multimedia}</p><h2>{t.addMedia}</h2><div className="media-choice-row">{mediaTypes.map(type=><button key={type} className={draft.type===type?'active':''} onClick={()=>setDraft(item=>({...item,type}))}>{type==='image'?<ImageIcon size={15}/>:type==='video'?<Video size={15}/>:<LinkIcon size={15}/>} {mediaTypeLabel(type,t)}</button>)}</div><div className="form-grid"><label>{t.url}<input value={draft.url} onChange={event=>{setError('');setDraft(item=>({...item,url:event.target.value}))}} autoFocus/></label><Field label={t.mediaTitle} value={localize(draft.title,lang)} change={value=>setDraft(item=>({...item,title:localizedChange(item.title,value)}))}/><Field label={t.caption} value={localize(draft.caption,lang)} change={value=>setDraft(item=>({...item,caption:localizedChange(item.caption,value)}))}/><Field label={t.alt} value={localize(draft.alt,lang)} change={value=>setDraft(item=>({...item,alt:localizedChange(item.alt,value)}))}/></div>{error&&<p className="errors">{error}</p>}<div className="modal-actions"><button onClick={close}>{t.cancel}</button><button className="primary" disabled={!draft.url.trim()} onClick={apply}>{t.create}</button></div></section></div>;
+ const upload=async(file?:File)=>{
+  if(!file)return;
+  setUploading(true);setError('');
+  try{
+   const form=new FormData();
+   form.append('file',file);
+   const response=await fetch('/api/uploads',{method:'POST',credentials:'include',body:form});
+   const body=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(body.message??`Upload failed (${response.status})`);
+   setDraft(item=>({...item,type:body.type==='video'?'video':'image',url:String(body.url),title:item.title??localized(body.filename??file.name,lang),alt:item.alt??localized(body.filename??file.name,lang)}));
+  }catch(err){setError(err instanceof Error?err.message:t.syncError)}
+  finally{setUploading(false)}
+ };
+ const mediaAccept=draft.type==='video'?'video/*':'image/*';
+ return <div className="modal" role="dialog" aria-modal="true"><section className="compact-modal"><button className="close" onClick={close}>x</button><p className="eyebrow">{t.multimedia}</p><h2>{t.addMedia}</h2><div className="media-choice-row">{mediaTypes.map(type=><button key={type} className={draft.type===type?'active':''} onClick={()=>setDraft(item=>({...item,type}))}>{type==='image'?<ImageIcon size={15}/>:type==='video'?<Video size={15}/>:<LinkIcon size={15}/>} {mediaTypeLabel(type,t)}</button>)}</div>{(draft.type==='image'||draft.type==='video')&&<div className="media-source-row"><input ref={cameraRef} hidden type="file" accept={mediaAccept} capture="environment" onChange={event=>void upload(event.target.files?.[0])}/><input ref={libraryRef} hidden type="file" accept={mediaAccept} onChange={event=>void upload(event.target.files?.[0])}/><input ref={fileRef} hidden type="file" accept={mediaAccept} onChange={event=>void upload(event.target.files?.[0])}/><button disabled={uploading} onClick={()=>cameraRef.current?.click()}><Camera size={16}/> {t.camera}</button><button disabled={uploading} onClick={()=>libraryRef.current?.click()}><ImageIcon size={16}/> {t.photoLibrary}</button><button disabled={uploading} onClick={()=>fileRef.current?.click()}><FileUp size={16}/> {t.file}</button></div>}<div className="form-grid"><label>{t.url}<input value={draft.url} onChange={event=>{setError('');setDraft(item=>({...item,url:event.target.value}))}} autoFocus/></label><Field label={t.mediaTitle} value={localize(draft.title,lang)} change={value=>setDraft(item=>({...item,title:localizedChange(item.title,value)}))}/><Field label={t.caption} value={localize(draft.caption,lang)} change={value=>setDraft(item=>({...item,caption:localizedChange(item.caption,value)}))}/><Field label={t.alt} value={localize(draft.alt,lang)} change={value=>setDraft(item=>({...item,alt:localizedChange(item.alt,value)}))}/></div>{draft.url&&<div className="media-preview"><MediaView node={{id:'preview',type:'multimedia',title:'',media:[draft]}} lang={lang}/></div>}{uploading&&<p className="warnings">{t.uploading}...</p>}{error&&<p className="errors">{error}</p>}<div className="modal-actions"><button onClick={close}>{t.cancel}</button><button className="primary" disabled={!draft.url.trim()||uploading} onClick={apply}>{t.create}</button></div></section></div>;
 }
 
 function NodeTypePickerModal({intent,close,choose,t}:{intent:NodePickerIntent;close:()=>void;choose:(type:NodeType)=>void;t:Record<string,string>}){

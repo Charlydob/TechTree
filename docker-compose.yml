@@ -20,8 +20,13 @@ services:
     environment:
       PORT: ${PORT:-3003}
       NODE_ENV: ${NODE_ENV:-production}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/opt/TechTree/uploads}
+      MAX_IMAGE_UPLOAD_BYTES: ${MAX_IMAGE_UPLOAD_BYTES:-15728640}
+      MAX_VIDEO_UPLOAD_BYTES: ${MAX_VIDEO_UPLOAD_BYTES:-209715200}
     ports:
       - "127.0.0.1:${PORT:-3003}:${PORT:-3003}"
+    volumes:
+      - techtree_uploads:${UPLOAD_DIR:-/opt/TechTree/uploads}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${PORT:-3003}/api/health || exit 1"]
       interval: 30s
@@ -36,3 +41,6 @@ networks:
   charly-stack:
     external: true
     name: charly-stack_default
+
+volumes:
+  techtree_uploads:

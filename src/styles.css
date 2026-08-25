@@ -401,3 +401,77 @@ main{max-width:1180px;margin:auto;padding:32px 20px}
  .mobile-branch-list{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
  .mobile-branch-list button{flex:0 0 min(260px,80vw);justify-content:flex-start;text-align:left}
 }
+
+.mobile-app-shell{display:none}
+
+@media(max-width:760px){
+ html,body,#root{min-height:100%;overflow-x:hidden}
+ .app{min-height:100dvh;padding-bottom:0}
+ .app>header{position:sticky;top:0;z-index:40}
+ .app>header .brand b,.app>header .header-secondary{display:none}
+ .app>header .brand span{min-width:50px}
+ .app>header .sync-indicator.synced{max-width:34px;color:transparent;position:relative}
+ .app>header .sync-indicator.synced::after{content:"OK";position:absolute;inset:0;display:grid;place-items:center;color:var(--success);font-size:10px}
+ .app>header .sync-indicator.saving{transition:opacity .2s;opacity:.72}
+ .app>main.home{display:none}
+ .mobile-app-shell{display:block;min-height:calc(100dvh - 58px);padding:10px 12px calc(74px + env(safe-area-inset-bottom));max-width:560px;margin:0 auto}
+ .mobile-view{display:grid;gap:12px;align-content:start;min-height:calc(100dvh - 142px)}
+ .mobile-view h1{font-size:24px;line-height:1.15;margin:2px 0 4px}
+ .mobile-view h2{font-size:20px;line-height:1.2;margin:0}
+ .mobile-view p{margin:0;color:var(--muted);line-height:1.45}
+ .mobile-search-box{display:flex!important;align-items:center;gap:10px;min-height:48px;padding:0 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);font-weight:800;margin:0}
+ .mobile-search-box input{border:0;background:transparent;padding:10px 0;outline:0}
+ .mobile-section-head,.mobile-topbar,.mobile-node-pager,.mobile-workflow-actions{display:flex;align-items:center;justify-content:space-between;gap:8px}
+ .mobile-create{width:44px;padding:0}
+ .mobile-list{display:grid;gap:8px}
+ .mobile-workflow-row,.mobile-folder-row,.mobile-search-result{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;background:var(--surface);padding:11px 12px}
+ .mobile-workflow-row span:first-child,.mobile-folder-row span:first-child,.mobile-search-result{min-width:0;display:grid;gap:2px}
+ .mobile-workflow-row b,.mobile-folder-row b,.mobile-search-result b{font-size:15px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .mobile-workflow-row small,.mobile-folder-row small,.mobile-search-result small,.mobile-search-result span{color:var(--muted);font-size:12px;font-weight:700;line-height:1.3}
+ .mobile-search-result{display:grid;justify-items:start}
+ .mobile-bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:35;display:grid;grid-template-columns:repeat(4,1fr);gap:0;padding:6px 8px calc(6px + env(safe-area-inset-bottom));border-top:1px solid var(--border);background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(12px)}
+ .mobile-bottom-nav button{min-height:52px;border:0;background:transparent;display:grid;gap:2px;padding:4px;color:var(--muted);font-size:11px}
+ .mobile-bottom-nav button.active{color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+ .mobile-settings{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+ .mobile-settings label{display:grid;gap:6px;font-weight:800}
+ .mobile-settings>div{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-weight:800}
+ .mobile-breadcrumb{display:flex;gap:6px;overflow-x:auto;align-items:center;min-height:38px}
+ .mobile-breadcrumb button{flex:0 0 auto;min-height:34px;padding:5px 9px;font-size:12px}
+ .mobile-workflow-view .tags span{display:inline-flex;align-items:center}
+ .mobile-workflow-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+ .mobile-workflow-actions button{min-width:0;padding:8px 9px}
+ .mobile-node-summary{display:grid;gap:7px;margin-top:2px}
+ .mobile-node-summary button{justify-content:space-between;text-align:left}
+ .mobile-node-summary small{color:var(--muted);font-size:11px;text-transform:uppercase}
+ .mobile-editor-view{padding-bottom:10px}
+ .mobile-node-pager{position:sticky;top:58px;z-index:16;padding:8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+ .mobile-node-pager button{width:44px;padding:0}
+ .mobile-node-pager span{font-size:13px;font-weight:900;color:var(--muted)}
+ .mobile-editor-card{display:grid;gap:10px;padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+ .mobile-editor-card h1{font-size:22px;margin:0}
+ .mobile-card-connector{display:flex;justify-content:center;align-items:center;gap:8px}
+ .mobile-card-connector button{min-height:38px;padding:7px 10px;font-size:13px;border-style:dashed}
+ .mobile-card-connector small{color:var(--muted);font-size:12px}
+ .mobile-flow-line,.mobile-outcome-link{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:center;margin:6px 0}
+ .mobile-flow-line>span{font-weight:900;color:var(--muted);font-size:13px}
+ .mobile-flow-line button,.mobile-outcome-link button{min-width:0;min-height:38px;padding:6px 9px;font-size:13px;white-space:normal}
+ .mobile-outcome-link button:first-child{justify-content:flex-start;text-align:left}
+ .mobile-diagram-button{width:100%}
+ .mobile-node-map section{display:grid;gap:7px}
+ .mobile-node-map section>button:not(.close){width:100%;justify-content:space-between;text-align:left}
+ .mobile-node-map button.active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
+ .mobile-node-map small{color:var(--muted);font-size:11px;text-transform:uppercase}
+ .mobile-bottom-sheet{align-items:end}
+ .mobile-bottom-sheet section{border-radius:8px 8px 0 0;max-height:86dvh}
+ .mobile-diagram-view{height:calc(100dvh - 58px);display:grid;grid-template-rows:auto minmax(0,1fr);gap:8px;padding:10px 12px;background:var(--bg)}
+ .mobile-diagram-view .react-flow{min-height:0;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+ .media-source-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:10px}
+ .media-source-row button{padding:6px 4px;font-size:12px;min-width:0}
+ .media-preview{margin-top:10px}
+ .modal{padding:10px}
+ .modal section,.modal form{max-height:88dvh}
+}
+
+@media(min-width:761px){
+ .mobile-app-shell{display:none!important}
+}
