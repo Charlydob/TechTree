@@ -28,3 +28,11 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+    networks:
+      - default
+      - charly-stack
+
+networks:
+  charly-stack:
+    external: true
+    name: charly-stack_default
