@@ -82,6 +82,7 @@ import {ApiConflictError,AuthRequiredError,ImportRunbookExistsError,ImportVerifi
 import {exportRunbookJson,parseRunbookJson} from './lib/importExport';
 import {collectLocalizedText,getNode,localized,localize,migrateRunbook,nodeSearchText,slugify,splitList,toLines} from './lib/runbook';
 import {validateRunbook} from './lib/validation';
+import ProcedureEditor from './ProcedureEditor';
 
 type Mode='library'|'run'|'edit';
 type EditorView='diagram'|'cards';
@@ -242,7 +243,8 @@ export default function App(){
    const saved=await repository.save(next);
    setBooks(items=>items.map(item=>item.id===next.id?saved:item));
    setSyncState('synced');setSyncMessage(t.synced);setPendingCount(repository.pendingCount());setLastSyncAt(new Date());
-  }catch(error){handleSyncError(error,next)}
+   return saved;
+  }catch(error){handleSyncError(error,next);throw error}
  },[handleSyncError,repository,t]);
  const forceSaveConflict=useCallback(async()=>{
   if(!conflict)return;
@@ -290,7 +292,7 @@ export default function App(){
  const folderPaths=useMemo(()=>new Map(folders.map(folder=>[folder.id,folderPath(folder,folders)])),[folders]);
  const book=books.find(item=>item.id===selected);
  const addRecent=useCallback((item:Omit<RecentItem,'id'|'at'>)=>setRecents(items=>[{...item,id:`recent-${Date.now()}`,at:new Date().toISOString()},...items.filter(old=>old.bookId!==item.bookId||old.nodeId!==item.nodeId||old.query!==item.query)].slice(0,24)),[]);
- const update=(next:Runbook)=>{setBooks(items=>items.map(item=>item.id===book?.id?next:item));void persistRunbook(next)};
+ const update=async(next:Runbook)=>{setBooks(items=>items.map(item=>item.id===next.id?next:item));await persistRunbook(next)};
  const open=(nextBook:Runbook,nextMode:Mode,nodeId?:string)=>{setSelected(nextBook.id);setTargetNode(nodeId);setMode(nextMode);addRecent({bookId:nextBook.id,nodeId,type:nextMode==='run'?'procedure':'step',label:localize(nextBook.title,lang)})};
  const duplicate=(source:Runbook)=>{let id=`${source.id}-copy`,i=2;while(books.some(item=>item.id===id))id=`${source.id}-copy-${i++}`;const copy={...clone(source),id,serverVersion:undefined,title:{es:`${localize(source.title,'es')} (copia)`,en:`${localize(source.title,'en')} (Copy)`},metadata:{...source.metadata,author:'HTDE',updatedAt:new Date().toISOString()}};setBooks(items=>[...items,copy]);void persistRunbook(copy);open(copy,'edit')};
  const removeBook=(source:Runbook)=>{if(confirm(`${t.deleteGuide}: "${localize(source.title,lang)}"?`)){setBooks(items=>items.filter(item=>item.id!==source.id));void persistDelete(source)}};
@@ -491,7 +493,7 @@ export default function App(){
   </main>}
 
   {book&&mode==='run'&&<Runner key={`${book.id}-${targetNode??'start'}-${lang}-${site}`} book={book} onsite={site} setOnsite={setSite} startAt={targetNode} lang={lang} t={t} markRecent={addRecent} canEdit onSave={update}/>}
-  {book&&mode==='edit'&&<Editor initial={book} startAt={targetNode} onSave={update} onExit={()=>setMode('library')} lang={lang} t={t}/>}
+  {book&&mode==='edit'&&<ProcedureEditor initial={book} startAt={targetNode} onSave={async value=>{await update(value)}} onExit={()=>setMode('library')} lang={lang}/>}
   {importing&&<Importer books={books} close={()=>setImporting(false)} accept={acceptBook} lang={lang} t={t}/>}
   {creating&&<CreateRunbookModal close={()=>setCreating(false)} accept={createBook} lang={lang} t={t} folders={folders} folderPaths={folderPaths}/>}
   {quickCreate&&<QuickSolutionModal query={quickCreate} close={()=>setQuickCreate(undefined)} accept={saveQuick} lang={lang} t={t}/>}
@@ -532,7 +534,7 @@ function MobileShell({appMode,books,folders,folderPaths,selectedBook,selectedId,
    <button onClick={importGuide}><FileUp size={17}/> {t.importRunbook}</button>
   </section>}
   {view==='workflow'&&selectedBook&&<MobileWorkflow book={selectedBook} lang={lang} t={t} back={()=>setView('home')} run={runWorkflow} edit={editWorkflow} exportBook={exportWorkflow} setNode={setEditorNode} setView={setView}/>}
-  {view==='editor'&&selectedBook&&<MobileCardEditor key={`${selectedBook.id}-${selectedId}`} source={selectedBook} startAt={editorNode} lang={lang} t={t} back={()=>setView('workflow')} save={saveBook} openDiagram={()=>setView('diagram')} setExternalActive={setEditorNode}/>}
+  {view==='editor'&&selectedBook&&<ProcedureEditor key={`${selectedBook.id}-${selectedId}`} initial={selectedBook} startAt={editorNode} lang={lang} onSave={async value=>{saveBook(value)}} onExit={()=>setView('workflow')}/>}
   {view==='diagram'&&selectedBook&&<MobileDiagram source={selectedBook} active={editorNode??selectedBook.startNode} lang={lang} t={t} back={()=>setView('editor')} selectNode={id=>{setEditorNode(id);setView('editor')}}/>}
   {['home','folders','search','settings'].includes(view)&&<nav className="mobile-bottom-nav" aria-label="Mobile"><button className={view==='home'?'active':''} onClick={()=>setView('home')}><Home size={18}/><span>{t.home}</span></button><button className={view==='folders'?'active':''} onClick={()=>setView('folders')}><Folder size={18}/><span>{t.folders}</span></button><button className={view==='search'?'active':''} onClick={()=>setView('search')}><Search size={18}/><span>{t.search}</span></button><button className={view==='settings'?'active':''} onClick={()=>setView('settings')}><Settings size={18}/><span>{t.settings}</span></button></nav>}
  </main>;
@@ -572,6 +574,9 @@ function MobileWorkflow({book,lang,t,back,run,edit,exportBook,setNode,setView}:{
  </section>;
 }
 
+// Legacy graph editor kept only as a data-compatibility reference while old
+// runbooks continue to use graph-shaped JSON. It is no longer mounted.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function MobileCardEditor({source,startAt,lang,t,back,save,openDiagram,setExternalActive}:{source:Runbook;startAt?:string;lang:Language;t:Record<string,string>;back:()=>void;save:(book:Runbook)=>void;openDiagram:()=>void;setExternalActive:(id:string)=>void}){
  const [book,setBook]=useState(()=>clone(source));
  const [active,setActiveState]=useState(startAt&&getNode(source,startAt)?startAt:source.startNode);
@@ -876,6 +881,7 @@ function QuickSolutionModal({query,close,accept,lang,t}:{query:string;close:()=>
  return <div className="modal" role="dialog" aria-modal="true"><section><button className="close" onClick={close}>x</button><p className="eyebrow">{t.noResults}</p><h2>{t.solutionEditor}</h2><div className="form-grid"><label>{t.errorProblem}<input value={problem} onChange={event=>setProblem(event.target.value)} autoFocus/></label><label>{t.tags}<input value={tags} onChange={event=>setTags(event.target.value)} placeholder="Vite, npm"/></label><label>{t.variants}<textarea rows={3} value={variants} onChange={event=>setVariants(event.target.value)} placeholder="vite is not recognized&#10;vite: command not found"/></label><label>{t.description}<textarea rows={3} value={description} onChange={event=>setDescription(event.target.value)}/></label><label>{t.possibleCause}<textarea rows={2} value={cause} onChange={event=>setCause(event.target.value)}/></label><label>{t.step} 1, 2...<textarea rows={5} value={steps} onChange={event=>setSteps(event.target.value)} placeholder={t.oneStepPerLine}/></label><label>{t.optionalCommand}<textarea rows={4} value={command} onChange={event=>setCommand(event.target.value)}/></label><label>{t.finalSolution}<textarea rows={3} value={finalSolution} onChange={event=>setFinalSolution(event.target.value)}/></label><label>{t.expectedResult}<input value={expected} onChange={event=>setExpected(event.target.value)}/></label></div><button className="primary wide" disabled={!problem.trim()} onClick={save}>{t.saveInLibrary}</button></section></div>;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function Editor({initial,startAt,onSave,onExit,lang,t}:{initial:Runbook;startAt?:string;onSave:(book:Runbook)=>void;onExit:()=>void;lang:Language;t:Record<string,string>}){return <ReactFlowProvider><FlowEditor initial={initial} startAt={startAt} onSave={onSave} onExit={onExit} lang={lang} t={t}/></ReactFlowProvider>}
 
 function FlowEditor({initial,startAt,onSave,onExit,lang,t}:{initial:Runbook;startAt?:string;onSave:(book:Runbook)=>void;onExit:()=>void;lang:Language;t:Record<string,string>}){

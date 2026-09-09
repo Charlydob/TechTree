@@ -137,12 +137,8 @@ describe('App sync',()=>{
   await waitFor(()=>expect(container.querySelectorAll('.workflow-card')).toHaveLength(1));
   const editButton=container.querySelector('.workflow-actions button[title="Modificar este procedimiento."]') as HTMLButtonElement;
   fireEvent.click(editButton);
-  await screen.findByText('EDITOR VISUAL HTDE');
-  const addMedia=container.querySelector('.media-head button') as HTMLButtonElement;
-  fireEvent.click(addMedia);
-  await screen.findByRole('heading',{name:'Anadir multimedia'});
-  expect(localStorage.getItem('tech-runbook.draft.rfid-integration')).toBeNull();
-  fireEvent.click(screen.getByText('Cancelar'));
+  await screen.findByText('PROCEDIMIENTO');
+  fireEvent.click(screen.getByText('Multimedia'));
   expect(localStorage.getItem('tech-runbook.draft.rfid-integration')).toBeNull();
  });
 
@@ -164,14 +160,12 @@ describe('App sync',()=>{
   await waitFor(()=>expect(container.querySelectorAll('.workflow-card')).toHaveLength(1));
   const editButton=container.querySelector('.workflow-actions button[title="Modificar este procedimiento."]') as HTMLButtonElement;
   fireEvent.click(editButton);
-  await screen.findByText('EDITOR VISUAL HTDE');
-  fireEvent.click(container.querySelector('.media-head button') as HTMLButtonElement);
-  await screen.findByRole('heading',{name:'Anadir multimedia'});
-  const cameraInput=container.querySelector('.media-source-row input[capture]') as HTMLInputElement;
+  await screen.findByText('PROCEDIMIENTO');
+  fireEvent.click(screen.getByRole('button',{name:/Imagen/i}));
+  const cameraInput=await screen.findByLabelText('Subir multimedia 1') as HTMLInputElement;
   fireEvent.change(cameraInput,{target:{files:[new File(['jpeg'],'photo.jpg',{type:'image/jpeg'})]}});
   await screen.findByDisplayValue('/uploads/mobile-photo.jpg');
-  fireEvent.click(screen.getByText('Crear'));
-  fireEvent.click(container.querySelector('button[title="Guardar"]') as HTMLButtonElement);
+  fireEvent.click(screen.getByRole('button',{name:/Guardar/i}));
 
   await waitFor(()=>expect(savedBody).toBeTruthy());
   const media=(savedBody as {runbook:Runbook}).runbook.nodes[0].media;
