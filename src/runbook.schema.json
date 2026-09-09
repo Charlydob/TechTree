@@ -56,9 +56,17 @@
       "additionalProperties": false,
       "required": ["type", "url", "alt"],
       "properties": {
-        "type": {"enum": ["image", "video", "youtube", "link"]},
+        "id": {"type": "string", "minLength": 1},
+        "type": {"enum": ["image", "audio", "video", "youtube", "link"]},
         "url": {"type": "string", "minLength": 1},
         "alt": {"$ref": "#/$defs/localizedString"},
+        "filename": {"type": "string"},
+        "mimeType": {"type": "string"},
+        "size": {"type": "integer", "minimum": 0},
+        "createdAt": {"type": "string", "format": "date-time"},
+        "duration": {"type": "number", "minimum": 0},
+        "metadata": {"type": "object", "additionalProperties": {"anyOf": [{"type": "string"}, {"type": "number"}, {"type": "boolean"}, {"type": "null"}]}},
+        "audioMarkers": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "time", "title"], "properties": {"id": {"type": "string", "minLength": 1}, "time": {"type": "number", "minimum": 0}, "title": {"type": "string", "minLength": 1}}}},
         "caption": {"$ref": "#/$defs/localizedString"},
         "description": {"$ref": "#/$defs/localizedString"},
         "title": {"$ref": "#/$defs/localizedString"}

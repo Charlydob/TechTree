@@ -19,16 +19,25 @@ interface AppOptions {
  jsonLimit?:string;
  uploadDir?:string;
  maxImageBytes?:number;
+ maxAudioBytes?:number;
  maxVideoBytes?:number;
 }
 
 const imageMimes=new Set(['image/jpeg','image/png','image/webp','image/heic']);
+const audioMimes=new Set(['audio/mpeg','audio/mp4','audio/aac','audio/ogg','audio/webm','audio/wav','audio/x-wav']);
 const videoMimes=new Set(['video/mp4','video/quicktime','video/webm']);
 const mimeExtensions:Record<string,string>={
  'image/jpeg':'.jpg',
  'image/png':'.png',
  'image/webp':'.webp',
  'image/heic':'.heic',
+ 'audio/mpeg':'.mp3',
+ 'audio/mp4':'.m4a',
+ 'audio/aac':'.aac',
+ 'audio/ogg':'.ogg',
+ 'audio/webm':'.webm',
+ 'audio/wav':'.wav',
+ 'audio/x-wav':'.wav',
  'video/mp4':'.mp4',
  'video/quicktime':'.mov',
  'video/webm':'.webm',
@@ -75,11 +84,12 @@ function safeFilename(value:string){
 
 function mediaKind(mime:string){
  if(imageMimes.has(mime))return 'image';
+ if(audioMimes.has(mime))return 'audio';
  if(videoMimes.has(mime))return 'video';
  return undefined;
 }
 
-export function createApp({store,appPassword,sessionSecret,secureCookies=process.env.NODE_ENV==='production',jsonLimit='2mb',uploadDir=process.env.UPLOAD_DIR??'/opt/TechTree/uploads',maxImageBytes=Number(process.env.MAX_IMAGE_UPLOAD_BYTES??15*1024*1024),maxVideoBytes=Number(process.env.MAX_VIDEO_UPLOAD_BYTES??200*1024*1024)}:AppOptions){
+export function createApp({store,appPassword,sessionSecret,secureCookies=process.env.NODE_ENV==='production',jsonLimit='2mb',uploadDir=process.env.UPLOAD_DIR??'/opt/TechTree/uploads',maxImageBytes=Number(process.env.MAX_IMAGE_UPLOAD_BYTES??15*1024*1024),maxAudioBytes=Number(process.env.MAX_AUDIO_UPLOAD_BYTES??100*1024*1024),maxVideoBytes=Number(process.env.MAX_VIDEO_UPLOAD_BYTES??200*1024*1024)}:AppOptions){
  const app=express();
  const clients=new Set<express.Response>();
  let revision=0;
@@ -98,14 +108,15 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
     callback(null,`${crypto.randomUUID()}${extension}`);
    },
   }),
-  limits:{fileSize:Math.max(maxImageBytes,maxVideoBytes),files:1},
+  limits:{fileSize:Math.max(maxImageBytes,maxAudioBytes,maxVideoBytes),files:1},
   fileFilter:(_request,file,callback)=>{
    if(!mediaKind(file.mimetype))return callback(validationError('Unsupported upload MIME type.'));
    callback(null,true);
   },
  });
 
- app.use('/uploads',express.static(uploadDir,{
+ app.use(cookieParser());
+ app.use('/uploads',requireAuth(sessionSecret),express.static(uploadDir,{
   fallthrough:false,
   index:false,
   dotfiles:'deny',
@@ -116,7 +127,6 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
  }));
 
  app.use(express.json({limit:jsonLimit}));
- app.use(cookieParser());
 
  app.get('/api/health',async (_request,response,next)=>{
   try{
@@ -151,21 +161,35 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
    if(!file)throw validationError('file is required');
    const type=mediaKind(file.mimetype);
    if(!type)throw validationError('Unsupported upload MIME type.');
-   const maxBytes=type==='image'?maxImageBytes:maxVideoBytes;
+   const maxBytes=type==='image'?maxImageBytes:type==='audio'?maxAudioBytes:maxVideoBytes;
    if(file.size>maxBytes){
     fs.unlink(file.path,()=>undefined);
     return response.status(413).json({error:'payload_too_large',message:`${type} upload is too large.`});
    }
    response.status(201).json({
     url:`/uploads/${file.filename}`,
+    id:path.parse(file.filename).name,
     type,
     filename:safeFilename(file.originalname),
     size:file.size,
-    mime:file.mimetype,
+    mimeType:file.mimetype,
+    createdAt:new Date().toISOString(),
    });
   }catch(error){
    next(error);
   }
+ });
+
+ app.delete('/api/uploads/:filename',async (request,response,next)=>{
+  try{
+   const filename=request.params.filename;
+   if(path.basename(filename)!==filename||!/^[-a-f0-9]+\.[a-z0-9]+$/i.test(filename))throw validationError('Invalid upload filename.');
+   const url=`/uploads/${filename}`;
+   if(await store.isUploadReferenced(url))return response.status(409).json({error:'media_in_use',message:'The upload is still referenced by a procedure.'});
+   const filePath=path.join(uploadDir,filename);
+   await fs.promises.unlink(filePath).catch(error=>{if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error});
+   response.json({ok:true});
+  }catch(error){next(error)}
  });
 
  app.get('/api/events',(request,response)=>{

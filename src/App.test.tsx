@@ -52,6 +52,7 @@ describe('App sync',()=>{
    if(url.endsWith('/folders')&&init?.method==='PUT')return jsonResponse({folders:[]});
    throw new Error(`Unexpected request ${init?.method??'GET'} ${url}`);
   }));
+  vi.stubGlobal('XMLHttpRequest',undefined);
 
   const {container}=render(<App/>);
 
@@ -161,10 +162,9 @@ describe('App sync',()=>{
   const editButton=container.querySelector('.workflow-actions button[title="Modificar este procedimiento."]') as HTMLButtonElement;
   fireEvent.click(editButton);
   await screen.findByText('PROCEDIMIENTO');
-  fireEvent.click(screen.getByRole('button',{name:/Imagen/i}));
-  const cameraInput=await screen.findByLabelText('Subir multimedia 1') as HTMLInputElement;
+  const cameraInput=await screen.findByLabelText('Subir imágenes') as HTMLInputElement;
   fireEvent.change(cameraInput,{target:{files:[new File(['jpeg'],'photo.jpg',{type:'image/jpeg'})]}});
-  await screen.findByDisplayValue('/uploads/mobile-photo.jpg');
+  await screen.findByText('mobile photo.jpg');
   fireEvent.click(screen.getByRole('button',{name:/Guardar/i}));
 
   await waitFor(()=>expect(savedBody).toBeTruthy());

@@ -70,7 +70,8 @@ describe('TechTree API',()=>{
   expect(uploaded.body).toMatchObject({type:'image',filename:'camera.jpg',size:4});
   expect(uploaded.body.url).toMatch(/^\/uploads\/[0-9a-f-]+\.jpg$/);
   expect(fs.existsSync(path.join(uploadDir,path.basename(uploaded.body.url)))).toBe(true);
-  await request(makeUploadApp(uploadDir)).get(uploaded.body.url).expect(200).expect('X-Content-Type-Options','nosniff');
+  await agent.get(uploaded.body.url).expect(200).expect('X-Content-Type-Options','nosniff');
+  await request(makeUploadApp(uploadDir)).get(uploaded.body.url).expect(401);
  });
 
  it('uploads a valid authenticated video',async()=>{
@@ -80,6 +81,29 @@ describe('TechTree API',()=>{
   const uploaded=await agent.post('/api/uploads').attach('file',Buffer.from('video'),{filename:'clip.mp4',contentType:'video/mp4'}).expect(201);
   expect(uploaded.body).toMatchObject({type:'video',filename:'clip.mp4',size:5});
   expect(uploaded.body.url).toMatch(/^\/uploads\/[0-9a-f-]+\.mp4$/);
+ });
+
+ it('persists audio metadata and markers in a runbook and safely deletes its file',async()=>{
+  const uploadDir=fs.mkdtempSync(path.join(os.tmpdir(),'htde-upload-'));
+  const app=makeUploadApp(uploadDir);
+  const agent=request.agent(app);
+  await login(agent).expect(200);
+  const uploaded=await agent.post('/api/uploads').attach('file',Buffer.from('audio'),{filename:'instructions.mp3',contentType:'audio/mpeg'}).expect(201);
+  expect(uploaded.body).toMatchObject({type:'audio',filename:'instructions.mp3',mimeType:'audio/mpeg',size:5});
+  const book=sample();
+  book.nodes[0].media=[{...uploaded.body,alt:'Instructions',duration:135,audioMarkers:[
+   {id:'start',time:10,title:'Inicio'},{id:'important',time:45,title:'Paso importante'},{id:'end',time:135,title:'Final'},
+  ]}];
+  await agent.post('/api/runbooks').send({runbook:book}).expect(201);
+  const loaded=await agent.get(`/api/runbooks/${book.id}`).expect(200);
+  expect(loaded.body.runbook.nodes[0].media[0].audioMarkers).toEqual(book.nodes[0].media[0].audioMarkers);
+  const filename=path.basename(uploaded.body.url);
+  await agent.delete(`/api/uploads/${filename}`).expect(409);
+  const withoutMedia=structuredClone(loaded.body.runbook) as Runbook;
+  withoutMedia.nodes[0].media=[];
+  await agent.put(`/api/runbooks/${book.id}`).send({runbook:withoutMedia,expectedVersion:1}).expect(200);
+  await agent.delete(`/api/uploads/${filename}`).expect(200);
+  expect(fs.existsSync(path.join(uploadDir,filename))).toBe(false);
  });
 
  it('rejects invalid upload MIME and oversized files',async()=>{

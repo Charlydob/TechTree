@@ -59,4 +59,8 @@ export class MemoryRunbookStore implements RunbookStore {
   this.folders=clone(folders);
   return clone(this.folders);
  }
+
+ async isUploadReferenced(url:string){
+  return [...this.runbooks.values()].some(({runbook})=>runbook.nodes.some(node=>[...(node.media??[]),...(node.outcomes??[]).flatMap(outcome=>outcome.media??[])].some(media=>media.url===url)));
+ }
 }

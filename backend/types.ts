@@ -18,6 +18,7 @@ export interface RunbookStore {
  duplicateRunbook(id:string,newId:string):Promise<StoredRunbook>;
  listFolders():Promise<FolderItem[]>;
  replaceFolders(folders:FolderItem[]):Promise<FolderItem[]>;
+ isUploadReferenced(url:string):Promise<boolean>;
  close?():Promise<void>;
 }
 
