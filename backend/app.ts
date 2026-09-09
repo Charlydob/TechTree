@@ -116,7 +116,7 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
  });
 
  app.use(cookieParser());
- app.use('/uploads',requireAuth(sessionSecret),express.static(uploadDir,{
+ const serveUploads=express.static(uploadDir,{
   fallthrough:false,
   index:false,
   dotfiles:'deny',
@@ -124,7 +124,15 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
    response.setHeader('X-Content-Type-Options','nosniff');
    response.setHeader('Cache-Control','public, max-age=31536000, immutable');
   },
- }));
+ });
+ // Keep media below /api so deployments which only proxy the API to this
+ // service do not accidentally send media requests to the SPA fallback.
+ // Cookie authentication works with native <img>/<video>/<audio> requests and
+ // express.static implements HEAD and byte ranges (206) required by HTML5 video.
+ app.use('/api/uploads',requireAuth(sessionSecret),(request,response,next)=>{
+  if(request.method==='GET'||request.method==='HEAD')return serveUploads(request,response,next);
+  next();
+ });
 
  app.use(express.json({limit:jsonLimit}));
 
@@ -167,7 +175,7 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
     return response.status(413).json({error:'payload_too_large',message:`${type} upload is too large.`});
    }
    response.status(201).json({
-    url:`/uploads/${file.filename}`,
+    url:`/api/uploads/${file.filename}`,
     id:path.parse(file.filename).name,
     type,
     filename:safeFilename(file.originalname),
@@ -184,7 +192,7 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
   try{
    const filename=request.params.filename;
    if(path.basename(filename)!==filename||!/^[-a-f0-9]+\.[a-z0-9]+$/i.test(filename))throw validationError('Invalid upload filename.');
-   const url=`/uploads/${filename}`;
+   const url=`/api/uploads/${filename}`;
    if(await store.isUploadReferenced(url))return response.status(409).json({error:'media_in_use',message:'The upload is still referenced by a procedure.'});
    const filePath=path.join(uploadDir,filename);
    await fs.promises.unlink(filePath).catch(error=>{if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error});
@@ -254,8 +262,19 @@ export function createApp({store,appPassword,sessionSecret,secureCookies=process
   try{
    const id=assertRunbookId(request.params.id);
    const expectedVersion=validateVersion(request.query.expectedVersion, false);
+   const existing=await store.getRunbook(id);
    const deleted=await store.deleteRunbook(id,expectedVersion);
-   if(deleted)publish('runbook.deleted',{id});
+   if(deleted){
+    publish('runbook.deleted',{id});
+    const urls=new Set(existing?.runbook.nodes.flatMap(node=>[
+     ...(node.media??[]),...(node.outcomes??[]).flatMap(outcome=>outcome.media??[]),
+    ]).map(media=>media.url).filter(url=>/^\/api\/uploads\/[A-Za-z0-9.-]+$/.test(url))??[]);
+    await Promise.all([...urls].map(async url=>{
+     if(await store.isUploadReferenced(url))return;
+     const filename=url.slice('/api/uploads/'.length);
+     await fs.promises.unlink(path.join(uploadDir,filename)).catch(error=>{if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error});
+    }));
+   }
    response.status(deleted?200:404).json(deleted?{ok:true}:{error:'not_found',message:'Runbook not found.'});
   }catch(error){
    next(error);

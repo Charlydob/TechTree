@@ -269,7 +269,14 @@ export default function App(){
  useEffect(()=>{saveLanguage(lang);document.documentElement.lang=lang;document.title='HTDE - How to Do Everything'},[lang]);
  useEffect(()=>saveTheme(dark),[dark]);
  useEffect(()=>saveRecents(recents),[recents]);
- useEffect(()=>{const timer=window.setTimeout(()=>void refreshFromServer(),0);const poll=window.setInterval(()=>void refreshFromServer(),30000);const online=()=>void refreshFromServer();window.addEventListener('online',online);return()=>{window.clearTimeout(timer);window.clearInterval(poll);window.removeEventListener('online',online)}},[refreshFromServer]);
+ useEffect(()=>{
+  const timer=window.setTimeout(()=>void refreshFromServer(),0);
+  const poll=window.setInterval(()=>{if(document.visibilityState==='visible')void refreshFromServer()},30000);
+  const revalidate=()=>void refreshFromServer();
+  const visible=()=>{if(document.visibilityState==='visible')void refreshFromServer()};
+  window.addEventListener('online',revalidate);window.addEventListener('focus',revalidate);document.addEventListener('visibilitychange',visible);
+  return()=>{window.clearTimeout(timer);window.clearInterval(poll);window.removeEventListener('online',revalidate);window.removeEventListener('focus',revalidate);document.removeEventListener('visibilitychange',visible)};
+ },[refreshFromServer]);
  useEffect(()=>{
   const unsubscribe=repository.subscribe(()=>void refreshFromServer(),state=>{
    if(state==='open'){
@@ -293,10 +300,10 @@ export default function App(){
  const folderPaths=useMemo(()=>new Map(folders.map(folder=>[folder.id,folderPath(folder,folders)])),[folders]);
  const book=books.find(item=>item.id===selected);
  const addRecent=useCallback((item:Omit<RecentItem,'id'|'at'>)=>setRecents(items=>[{...item,id:`recent-${Date.now()}`,at:new Date().toISOString()},...items.filter(old=>old.bookId!==item.bookId||old.nodeId!==item.nodeId||old.query!==item.query)].slice(0,24)),[]);
- const update=async(next:Runbook)=>{setBooks(items=>items.map(item=>item.id===next.id?next:item));await persistRunbook(next)};
+ const update=async(next:Runbook)=>{setBooks(items=>items.map(item=>item.id===next.id?next:item));return await persistRunbook(next)};
  const open=(nextBook:Runbook,nextMode:Mode,nodeId?:string)=>{setSelected(nextBook.id);setTargetNode(nodeId);setMode(nextMode);addRecent({bookId:nextBook.id,nodeId,type:nextMode==='run'?'procedure':'step',label:localize(nextBook.title,lang)})};
  const duplicate=(source:Runbook)=>{let id=`${source.id}-copy`,i=2;while(books.some(item=>item.id===id))id=`${source.id}-copy-${i++}`;const copy={...clone(source),id,serverVersion:undefined,title:{es:`${localize(source.title,'es')} (copia)`,en:`${localize(source.title,'en')} (Copy)`},metadata:{...source.metadata,author:'HTDE',updatedAt:new Date().toISOString()}};setBooks(items=>[...items,copy]);void persistRunbook(copy);open(copy,'edit')};
- const removeBook=(source:Runbook)=>{if(confirm(`${t.deleteGuide}: "${localize(source.title,lang)}"?`)){setBooks(items=>items.filter(item=>item.id!==source.id));void persistDelete(source)}};
+ const removeBook=(source:Runbook)=>{if(!confirm(`${t.deleteGuide}: "${localize(source.title,lang)}"?`))return false;setBooks(items=>items.filter(item=>item.id!==source.id));void persistDelete(source);return true};
  const runSearch=useMemo(()=>searchResults(books,search,tagFilter,lang),[books,search,tagFilter,lang]);
  const visibleBooks=useMemo(()=>books.filter(item=>{
   const folder=folderOf(item);
@@ -382,7 +389,7 @@ export default function App(){
   <header>
    <button className="brand" onClick={()=>setMode('library')} aria-label="HTDE Home"><span>HTDE</span><b>How to Do Everything</b></button>
    <div className="header-actions">
-     <SyncIndicator state={syncState} pending={pendingCount} message={syncMessage} lastSyncAt={lastSyncAt} realtimeActive={realtimeActive} open={syncDetailsOpen} setOpen={setSyncDetailsOpen} t={t}/>
+     {(syncState!=='synced'||pendingCount>0)&&<SyncIndicator state={syncState} pending={pendingCount} message={syncMessage} lastSyncAt={lastSyncAt} realtimeActive={realtimeActive} open={syncDetailsOpen} setOpen={setSyncDetailsOpen} t={t}/>}
     <div className="header-secondary">
      <label className="language-select" title={t.language}><span>{t.language}</span><select value={lang} onChange={event=>setLang(event.target.value as Language)}><option value="es">{t.spanish}</option><option value="en">{t.english}</option></select></label>
      <button className="icon-button" title={t.toggleTheme} onClick={()=>setDark(value=>!value)} aria-label={t.toggleTheme}>{dark?<Sun size={18}/>:<Moon size={18}/>}</button>
@@ -425,6 +432,7 @@ export default function App(){
    runWorkflow={item=>{setSite(false);open(item,'run')}}
    editWorkflow={item=>{setSelected(item.id);setTargetNode(item.startNode);setMobileEditorNode(item.startNode);setMobileView('editor')}}
    exportWorkflow={download}
+   deleteWorkflow={item=>{if(removeBook(item))setMobileView('home')}}
    saveBook={update}
   />
 
@@ -510,7 +518,7 @@ export default function App(){
  </div>;
 }
 
-function MobileShell({appMode,books,folders,folderPaths,selectedBook,selectedId,view,setView,currentFolderId,setCurrentFolderId,editorNode,setEditorNode,search,setSearch,recents,lang,t,buildVersion,dark,setDark,setLang,openWorkflow,createGuide,importGuide,createFolder,setFolderFromPath,runWorkflow,editWorkflow,exportWorkflow,saveBook}:{appMode:Mode;books:Runbook[];folders:FolderItem[];folderPaths:Map<string,string>;selectedBook?:Runbook;selectedId?:string;view:MobileView;setView:(view:MobileView)=>void;currentFolderId?:string;setCurrentFolderId:(id?:string)=>void;editorNode?:string;setEditorNode:(id:string)=>void;search:string;setSearch:(value:string)=>void;recents:RecentItem[];lang:Language;t:Record<string,string>;buildVersion:string;dark:boolean;setDark:(value:(current:boolean)=>boolean)=>void;setLang:(lang:Language)=>void;openWorkflow:(book:Runbook)=>void;createGuide:()=>void;importGuide:()=>void;createFolder:(parentId?:string)=>void;setFolderFromPath:(path?:string)=>void;runWorkflow:(book:Runbook)=>void;editWorkflow:(book:Runbook)=>void;exportWorkflow:(book:Runbook)=>void;saveBook:(book:Runbook)=>void}){
+function MobileShell({appMode,books,folders,folderPaths,selectedBook,selectedId,view,setView,currentFolderId,setCurrentFolderId,editorNode,setEditorNode,search,setSearch,recents,lang,t,buildVersion,dark,setDark,setLang,openWorkflow,createGuide,importGuide,createFolder,setFolderFromPath,runWorkflow,editWorkflow,exportWorkflow,deleteWorkflow,saveBook}:{appMode:Mode;books:Runbook[];folders:FolderItem[];folderPaths:Map<string,string>;selectedBook?:Runbook;selectedId?:string;view:MobileView;setView:(view:MobileView)=>void;currentFolderId?:string;setCurrentFolderId:(id?:string)=>void;editorNode?:string;setEditorNode:(id:string)=>void;search:string;setSearch:(value:string)=>void;recents:RecentItem[];lang:Language;t:Record<string,string>;buildVersion:string;dark:boolean;setDark:(value:(current:boolean)=>boolean)=>void;setLang:(lang:Language)=>void;openWorkflow:(book:Runbook)=>void;createGuide:()=>void;importGuide:()=>void;createFolder:(parentId?:string)=>void;setFolderFromPath:(path?:string)=>void;runWorkflow:(book:Runbook)=>void;editWorkflow:(book:Runbook)=>void;exportWorkflow:(book:Runbook)=>void;deleteWorkflow:(book:Runbook)=>void;saveBook:(book:Runbook)=>void}){
  if(appMode!=='library')return null;
  const recentBooks=Array.from(new Map(recents.map(item=>books.find(book=>book.id===item.bookId)).filter((book):book is Runbook=>Boolean(book)).map(book=>[book.id,book])).values()).slice(0,5);
  const visibleRecent=recentBooks.length?recentBooks:books.slice(0,5);
@@ -534,7 +542,7 @@ function MobileShell({appMode,books,folders,folderPaths,selectedBook,selectedId,
    <div><span>{t.version}</span><code>{buildVersion}</code></div>
    <button onClick={importGuide}><FileUp size={17}/> {t.importRunbook}</button>
   </section>}
-  {view==='workflow'&&selectedBook&&<MobileWorkflow book={selectedBook} lang={lang} t={t} back={()=>setView('home')} run={runWorkflow} edit={editWorkflow} exportBook={exportWorkflow} setNode={setEditorNode} setView={setView}/>}
+  {view==='workflow'&&selectedBook&&<MobileWorkflow book={selectedBook} lang={lang} t={t} back={()=>setView('home')} run={runWorkflow} edit={editWorkflow} exportBook={exportWorkflow} deleteBook={deleteWorkflow} setNode={setEditorNode} setView={setView}/>}
   {view==='editor'&&selectedBook&&<ProcedureEditor key={`${selectedBook.id}-${selectedId}`} initial={selectedBook} startAt={editorNode} lang={lang} onSave={async value=>{saveBook(value)}} onExit={()=>setView('workflow')}/>}
   {view==='diagram'&&selectedBook&&<MobileDiagram source={selectedBook} active={editorNode??selectedBook.startNode} lang={lang} t={t} back={()=>setView('editor')} selectNode={id=>{setEditorNode(id);setView('editor')}}/>}
   {['home','folders','search','settings'].includes(view)&&<nav className="mobile-bottom-nav" aria-label="Mobile"><button className={view==='home'?'active':''} onClick={()=>setView('home')}><Home size={18}/><span>{t.home}</span></button><button className={view==='folders'?'active':''} onClick={()=>setView('folders')}><Folder size={18}/><span>{t.folders}</span></button><button className={view==='search'?'active':''} onClick={()=>setView('search')}><Search size={18}/><span>{t.search}</span></button><button className={view==='settings'?'active':''} onClick={()=>setView('settings')}><Settings size={18}/><span>{t.settings}</span></button></nav>}
@@ -563,9 +571,9 @@ function MobileFolders({books,folders,folderPaths,currentFolderId,setCurrentFold
  </section>;
 }
 
-function MobileWorkflow({book,lang,t,back,run,edit,exportBook,setNode,setView}:{book:Runbook;lang:Language;t:Record<string,string>;back:()=>void;run:(book:Runbook)=>void;edit:(book:Runbook)=>void;exportBook:(book:Runbook)=>void;setNode:(id:string)=>void;setView:(view:MobileView)=>void}){
+function MobileWorkflow({book,lang,t,back,run,edit,exportBook,deleteBook,setNode,setView}:{book:Runbook;lang:Language;t:Record<string,string>;back:()=>void;run:(book:Runbook)=>void;edit:(book:Runbook)=>void;exportBook:(book:Runbook)=>void;deleteBook:(book:Runbook)=>void;setNode:(id:string)=>void;setView:(view:MobileView)=>void}){
  return <section className="mobile-view mobile-workflow-view">
-  <div className="mobile-topbar"><button onClick={back}><ChevronLeft size={17}/> {t.backToLibrary}</button><details className="overflow-menu"><summary aria-label={t.menu}>...</summary><div><button onClick={()=>exportBook(book)}>{t.exportJson}</button></div></details></div>
+  <div className="mobile-topbar"><button onClick={back}><ChevronLeft size={17}/> {t.backToLibrary}</button><details className="overflow-menu"><summary aria-label={t.menu}>...</summary><div><button onClick={()=>exportBook(book)}>{t.exportJson}</button><button className="danger" onClick={()=>deleteBook(book)}>{t.deleteGuide}</button></div></details></div>
   <p className="eyebrow">{t.workflowView}</p>
   <h1>{localize(book.title,lang)}</h1>
   <p>{localize(book.description,lang)}</p>

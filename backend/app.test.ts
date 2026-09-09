@@ -62,13 +62,13 @@ describe('TechTree API',()=>{
   await agent.get('/api/folders').expect(200).expect(({body})=>expect(body.folders).toEqual(folders));
  });
 
- it('uploads a valid authenticated image and serves it from /uploads',async()=>{
+ it('uploads a valid authenticated image and serves it from the proxied API path',async()=>{
   const uploadDir=fs.mkdtempSync(path.join(os.tmpdir(),'htde-upload-'));
   const agent=request.agent(makeUploadApp(uploadDir));
   await login(agent).expect(200);
   const uploaded=await agent.post('/api/uploads').attach('file',Buffer.from([0xff,0xd8,0xff,0xd9]),{filename:'camera.jpg',contentType:'image/jpeg'}).expect(201);
   expect(uploaded.body).toMatchObject({type:'image',filename:'camera.jpg',size:4});
-  expect(uploaded.body.url).toMatch(/^\/uploads\/[0-9a-f-]+\.jpg$/);
+  expect(uploaded.body.url).toMatch(/^\/api\/uploads\/[0-9a-f-]+\.jpg$/);
   expect(fs.existsSync(path.join(uploadDir,path.basename(uploaded.body.url)))).toBe(true);
   await agent.get(uploaded.body.url).expect(200).expect('X-Content-Type-Options','nosniff');
   await request(makeUploadApp(uploadDir)).get(uploaded.body.url).expect(401);
@@ -80,7 +80,8 @@ describe('TechTree API',()=>{
   await login(agent).expect(200);
   const uploaded=await agent.post('/api/uploads').attach('file',Buffer.from('video'),{filename:'clip.mp4',contentType:'video/mp4'}).expect(201);
   expect(uploaded.body).toMatchObject({type:'video',filename:'clip.mp4',size:5});
-  expect(uploaded.body.url).toMatch(/^\/uploads\/[0-9a-f-]+\.mp4$/);
+  expect(uploaded.body.url).toMatch(/^\/api\/uploads\/[0-9a-f-]+\.mp4$/);
+  await agent.get(uploaded.body.url).set('Range','bytes=1-3').expect(206).expect('Accept-Ranges','bytes').expect('Content-Range',/^bytes 1-3\/5$/).expect('Content-Type',/video\/mp4/);
  });
 
  it('persists audio metadata and markers in a runbook and safely deletes its file',async()=>{

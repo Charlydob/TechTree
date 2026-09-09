@@ -43,7 +43,12 @@ function versionOf(runbook:Runbook){
 }
 
 function withServerVersion(item:StoredRunbook){
- return {...migrateRunbook(item.runbook),serverVersion:item.version,metadata:{...item.runbook.metadata,updatedAt:item.updatedAt}};
+ const runbook=migrateRunbook(item.runbook);
+ const normalize=(url:string)=>url.startsWith('/uploads/')?`/api${url}`:url;
+ return {...runbook,nodes:runbook.nodes.map(node=>({...node,
+  media:node.media?.map(media=>({...media,url:normalize(media.url)})),
+  outcomes:node.outcomes?.map(outcome=>({...outcome,media:outcome.media?.map(media=>({...media,url:normalize(media.url)}))})),
+ })),serverVersion:item.version,metadata:{...item.runbook.metadata,updatedAt:item.updatedAt}};
 }
 
 function withoutServerVersion(runbook:Runbook){
@@ -300,10 +305,8 @@ export class ServerRunbookRepository {
  }
 
  async delete(runbook:Runbook){
-  const expectedVersion=versionOf(runbook);
   try{
-   const suffix=expectedVersion?`?expectedVersion=${expectedVersion}`:'';
-   await parseApiResponse(await fetch(`${this.baseUrl}/runbooks/${encodeURIComponent(runbook.id)}${suffix}`,{method:'DELETE',credentials:'include'}));
+   await parseApiResponse(await fetch(`${this.baseUrl}/runbooks/${encodeURIComponent(runbook.id)}`,{method:'DELETE',credentials:'include'}));
    const snapshot=this.local.list();
    this.local.saveRunbooks(snapshot.runbooks.filter(item=>item.id!==runbook.id));
   }catch(error){
@@ -311,7 +314,7 @@ export class ServerRunbookRepository {
    if(!navigator.onLine||error instanceof TypeError){
     const snapshot=this.local.list();
     this.local.saveRunbooks(snapshot.runbooks.filter(item=>item.id!==runbook.id));
-    this.local.enqueue({id:`pending-${Date.now()}-${Math.random().toString(36).slice(2)}`,type:'delete',runbookId:runbook.id,expectedVersion,createdAt:new Date().toISOString()});
+    this.local.enqueue({id:`pending-${Date.now()}-${Math.random().toString(36).slice(2)}`,type:'delete',runbookId:runbook.id,createdAt:new Date().toISOString()});
     throw new OfflineError();
    }
    throw error;
