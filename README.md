@@ -46,6 +46,7 @@ PUT    /api/folders
 GET    /api/sync
 POST   /api/sync/push
 POST   /api/uploads
+DELETE /api/uploads/:filename
 GET    /uploads/*
 ```
 
@@ -65,7 +66,7 @@ npm run build
 
 Use `src/runbook.schema.json`. IDs are lowercase kebab-case and unique. Every `nextNode` references a node in the same file. Unknown properties are rejected, producing field-level import errors. Valid imports show a preview; matching IDs are explicitly replaced. Export emits the edited version.
 
-Folders are stored as paths in `folder`, for example `Servidores/Docker/Deployments`, so existing import/export remains portable. Node positions stay in `node.ui`. Any node can include multimedia items: `image`, `video`, `youtube`, or `link`, with URL, alt text, captions, titles, and descriptions. Uploaded images/videos are stored on the backend volume and the runbook JSON keeps only the returned `/uploads/...` URL.
+Folders are stored as paths in `folder`, for example `Servidores/Docker/Deployments`, so existing import/export remains portable. Node positions stay in `node.ui`. Any node can include multimedia items: `image`, `audio`, `video`, `youtube`, or `link`. Uploaded files are stored on the backend volume; persistent metadata (ID, filename, MIME, size, duration) and chronologically ordered manual audio markers are stored in the PostgreSQL-backed runbook JSON. Existing runbooks without these optional fields remain valid.
 
 ## Database
 
@@ -88,7 +89,7 @@ frontend: 127.0.0.1:8080 -> container 80
 backend:  127.0.0.1:3003 -> container 3003
 ```
 
-Uploads are persisted in the Docker volume `techtree_uploads`, mounted at `UPLOAD_DIR` inside the backend container. The compose file still connects the backend to the external PostgreSQL network `charly-stack_default`; do not remove that network in deployment overrides.
+Uploads are persisted in the Docker volume `techtree_uploads`, mounted at `UPLOAD_DIR` inside the backend container. Container recreation therefore keeps files (do not deploy with `docker compose down -v`; back up this named volume together with PostgreSQL). Image, audio, and video limits are independently configurable through `MAX_IMAGE_UPLOAD_BYTES`, `MAX_AUDIO_UPLOAD_BYTES`, and `MAX_VIDEO_UPLOAD_BYTES`. Media delivery requires the existing HTDE session cookie and supports normal HTTP byte-range playback through Express. The compose file still connects the backend to the external PostgreSQL network `charly-stack_default`; do not remove that network in deployment overrides.
 
 Caddy should keep the public URL the same and split routes:
 

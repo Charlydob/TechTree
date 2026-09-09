@@ -23,6 +23,7 @@ import {
 import {
  ArrowDownToDot,
  ArrowUpFromDot,
+ AudioLines,
  Camera,
  ChevronLeft,
  CircleHelp,
@@ -123,7 +124,7 @@ const clone=<T,>(value:T):T=>structuredClone(value);
 const defaultBooks=[rfid as Runbook,webApp as Runbook].map(migrateRunbook);
 const uncategorized='';
 const nodeTypesList:NodeType[]=['action','question','check','command','troubleshooting','warning','solution','note','visual-identification','multimedia'];
-const mediaTypes:MediaType[]=['image','video','youtube','link'];
+const mediaTypes:MediaType[]=['image','audio','video','youtube','link'];
 
 const ui={
  es:{
@@ -160,7 +161,7 @@ function folderOf(book:Runbook){return book.folder??book.category??uncategorized
 function folderLabel(name:string,t:Record<string,string>){return name||t.noFolder}
 function uniqueFolderId(name:string){return `folder-${Date.now()}-${Math.random().toString(36).slice(2,7)}-${slugify(name||'sin-carpeta')}`}
 function nodeTypeLabel(type:NodeType,t:Record<string,string>){const labels:Record<NodeType,string>={action:'Accion',question:'Pregunta',check:'Comprobacion',command:t.addCommand,troubleshooting:t.addObservedError,warning:t.warning,solution:t.markAsSolution,note:'Nota','visual-identification':'Identificacion visual',multimedia:'Multimedia'};return labels[type]??type}
-function mediaTypeLabel(type:MediaType,t:Record<string,string>){return ({image:t.image,video:t.video,youtube:t.youtube,link:t.link})[type]}
+function mediaTypeLabel(type:MediaType,t:Record<string,string>){return ({image:t.image,audio:'Audio',video:t.video,youtube:t.youtube,link:t.link})[type]}
 function migrationSummary(result:MigrationResult){return `${result.uploaded} subidos / ${result.existing} ya existentes / ${result.conflicts} conflictos / ${result.errors} errores`}
 
 export default function App(){
@@ -816,12 +817,16 @@ function MediaView({node,lang}:{node:RunbookNode;lang:Language}){
  return <>{node.media?.map((media,index)=><figure key={`${media.url}-${index}`} className={`media media-${media.type}`}>
   {media.type==='image'&&<a href={media.url} target="_blank" rel="noreferrer"><img src={media.url} alt={localize(media.alt,lang)}/></a>}
   {media.type==='video'&&<video controls preload="metadata" src={media.url}/>}
+  {media.type==='audio'&&<PersistentAudio media={media}/>}
   {media.type==='youtube'&&(youtubeEmbed(media.url)?<iframe title={localize(media.title,lang)||localize(media.caption,lang)||'YouTube'} src={youtubeEmbed(media.url)} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen/>:<a href={media.url} target="_blank" rel="noreferrer">{media.url}</a>)}
   {media.type==='link'&&<a className="media-link" href={media.url} target="_blank" rel="noreferrer"><LinkIcon size={18}/><span>{localize(media.title,lang)||media.url}</span></a>}
   {media.caption&&<figcaption>{localize(media.caption,lang)}</figcaption>}
   {media.description&&<p>{localize(media.description,lang)}</p>}
  </figure>)}</>;
 }
+
+function PersistentAudio({media}:{media:Media}){const ref=useRef<HTMLAudioElement>(null);const markers=[...(media.audioMarkers??[])].sort((a,b)=>a.time-b.time);return <div className="runner-audio"><audio ref={ref} controls preload="metadata" src={media.url}/>{markers.length>0&&<div className="runner-markers">{markers.map(marker=><button key={marker.id} onClick={()=>{if(ref.current){ref.current.currentTime=marker.time;void ref.current.play()}}}>{formatMediaTime(marker.time)} — {marker.title}</button>)}</div>}</div>}
+function formatMediaTime(seconds:number){const value=Math.max(0,Math.floor(seconds));const h=Math.floor(value/3600),m=Math.floor(value%3600/60),s=value%60;return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`}
 
 function Runner({book,onsite,setOnsite,startAt,lang,t,markRecent,canEdit,onSave}:{book:Runbook;onsite:boolean;setOnsite:(value:boolean)=>void;startAt?:string;lang:Language;t:Record<string,string>;markRecent:(item:Omit<RecentItem,'id'|'at'>)=>void;canEdit:boolean;onSave:(book:Runbook)=>void}){
  const saved=loadProgress()[book.id]??[];
@@ -1060,7 +1065,7 @@ function MediaEditor({media,lang,t,change}:{media:Media[];lang:Language;t:Record
  const localizedChange=(value:LocalizedString|undefined,nextValue:string):LocalizedString=>typeof value==='string'?{es:lang==='es'?nextValue:value,en:lang==='en'?nextValue:value}:{...value,[lang]:nextValue};
  const move=(index:number,dir:number)=>{const target=index+dir;if(target<0||target>=media.length)return;const next=[...media];[next[index],next[target]]=[next[target],next[index]];change(next)};
  const empty=(type:MediaType):Media=>({type,url:'',alt:localized('',lang),caption:localized('',lang)});
- return <section className="media-editor"><div className="media-head"><h3>{t.multimedia}</h3><button className="primary" onClick={()=>setDraft(empty('image'))}><Plus size={15}/> {t.addMedia}</button></div><div className="media-add">{mediaTypes.map(type=><button key={type} onClick={()=>setDraft(empty(type))}>{type==='image'?<ImageIcon size={15}/>:type==='video'?<Video size={15}/>:<LinkIcon size={15}/>} {mediaTypeLabel(type,t)}</button>)}</div>{media.map((item,index)=><div className="media-row" key={`${item.type}-${index}`}><label>{t.type}<select value={item.type} onChange={event=>update(index,{...item,type:event.target.value as MediaType})}>{mediaTypes.map(type=><option key={type} value={type}>{mediaTypeLabel(type,t)}</option>)}</select></label><Field label={t.url} value={item.url} change={value=>update(index,{...item,url:value})}/><Field label={t.mediaTitle} value={localize(item.title,lang)} change={value=>update(index,{...item,title:localizedChange(item.title,value)})}/><Field label={t.caption} value={localize(item.caption,lang)} change={value=>update(index,{...item,caption:localizedChange(item.caption,value)})}/><Field label={t.alt} value={localize(item.alt,lang)} change={value=>update(index,{...item,alt:localizedChange(item.alt,value)})}/><label>{t.description}<textarea rows={2} value={localize(item.description,lang)} onChange={event=>update(index,{...item,description:localizedChange(item.description,event.target.value)})}/></label><div className="media-preview"><MediaView node={{id:'preview',type:'multimedia',title:'',media:[item]}} lang={lang}/></div><div className="media-actions"><button title={t.moveUp} onClick={()=>move(index,-1)}><ArrowUpFromDot size={15}/></button><button title={t.moveDown} onClick={()=>move(index,1)}><ArrowDownToDot size={15}/></button><button className="danger" onClick={()=>change(media.filter((_,itemIndex)=>itemIndex!==index))}><Trash2 size={15}/></button></div></div>)}{draft&&<MediaCreateModal initial={draft} lang={lang} t={t} close={()=>setDraft(undefined)} save={next=>{change([...media,next]);setDraft(undefined)}}/>}</section>;
+ return <section className="media-editor"><div className="media-head"><h3>{t.multimedia}</h3><button className="primary" onClick={()=>setDraft(empty('image'))}><Plus size={15}/> {t.addMedia}</button></div><div className="media-add">{mediaTypes.map(type=><button key={type} onClick={()=>setDraft(empty(type))}>{type==='image'?<ImageIcon size={15}/>:type==='video'?<Video size={15}/>:type==='audio'?<AudioLines size={15}/>:<LinkIcon size={15}/>} {mediaTypeLabel(type,t)}</button>)}</div>{media.map((item,index)=><div className="media-row" key={`${item.type}-${index}`}><label>{t.type}<select value={item.type} onChange={event=>update(index,{...item,type:event.target.value as MediaType})}>{mediaTypes.map(type=><option key={type} value={type}>{mediaTypeLabel(type,t)}</option>)}</select></label><Field label={t.url} value={item.url} change={value=>update(index,{...item,url:value})}/><Field label={t.mediaTitle} value={localize(item.title,lang)} change={value=>update(index,{...item,title:localizedChange(item.title,value)})}/><Field label={t.caption} value={localize(item.caption,lang)} change={value=>update(index,{...item,caption:localizedChange(item.caption,value)})}/><Field label={t.alt} value={localize(item.alt,lang)} change={value=>update(index,{...item,alt:localizedChange(item.alt,value)})}/><label>{t.description}<textarea rows={2} value={localize(item.description,lang)} onChange={event=>update(index,{...item,description:localizedChange(item.description,event.target.value)})}/></label><div className="media-preview"><MediaView node={{id:'preview',type:'multimedia',title:'',media:[item]}} lang={lang}/></div><div className="media-actions"><button title={t.moveUp} onClick={()=>move(index,-1)}><ArrowUpFromDot size={15}/></button><button title={t.moveDown} onClick={()=>move(index,1)}><ArrowDownToDot size={15}/></button><button className="danger" onClick={()=>change(media.filter((_,itemIndex)=>itemIndex!==index))}><Trash2 size={15}/></button></div></div>)}{draft&&<MediaCreateModal initial={draft} lang={lang} t={t} close={()=>setDraft(undefined)} save={next=>{change([...media,next]);setDraft(undefined)}}/>}</section>;
 }
 
 function MediaCreateModal({initial,lang,t,close,save}:{initial:Media;lang:Language;t:Record<string,string>;close:()=>void;save:(media:Media)=>void}){
@@ -1081,11 +1086,11 @@ function MediaCreateModal({initial,lang,t,close,save}:{initial:Media;lang:Langua
    const response=await fetch('/api/uploads',{method:'POST',credentials:'include',body:form});
    const body=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(body.message??`Upload failed (${response.status})`);
-   setDraft(item=>({...item,type:body.type==='video'?'video':'image',url:String(body.url),title:item.title??localized(body.filename??file.name,lang),alt:item.alt??localized(body.filename??file.name,lang)}));
+   setDraft(item=>({...item,id:body.id,type:body.type==='video'?'video':body.type==='audio'?'audio':'image',url:String(body.url),filename:body.filename,mimeType:body.mimeType,size:body.size,createdAt:body.createdAt,audioMarkers:body.type==='audio'?[]:undefined,title:item.title??localized(body.filename??file.name,lang),alt:item.alt??localized(body.filename??file.name,lang)}));
   }catch(err){setError(err instanceof Error?err.message:t.syncError)}
   finally{setUploading(false)}
  };
- const mediaAccept=draft.type==='video'?'video/*':'image/*';
+ const mediaAccept=draft.type==='video'?'video/*':draft.type==='audio'?'audio/*':'image/*';
  return <div className="modal" role="dialog" aria-modal="true"><section className="compact-modal"><button className="close" onClick={close}>x</button><p className="eyebrow">{t.multimedia}</p><h2>{t.addMedia}</h2><div className="media-choice-row">{mediaTypes.map(type=><button key={type} className={draft.type===type?'active':''} onClick={()=>setDraft(item=>({...item,type}))}>{type==='image'?<ImageIcon size={15}/>:type==='video'?<Video size={15}/>:<LinkIcon size={15}/>} {mediaTypeLabel(type,t)}</button>)}</div>{(draft.type==='image'||draft.type==='video')&&<div className="media-source-row"><input ref={cameraRef} hidden type="file" accept={mediaAccept} capture="environment" onChange={event=>void upload(event.target.files?.[0])}/><input ref={libraryRef} hidden type="file" accept={mediaAccept} onChange={event=>void upload(event.target.files?.[0])}/><input ref={fileRef} hidden type="file" accept={mediaAccept} onChange={event=>void upload(event.target.files?.[0])}/><button disabled={uploading} onClick={()=>cameraRef.current?.click()}><Camera size={16}/> {t.camera}</button><button disabled={uploading} onClick={()=>libraryRef.current?.click()}><ImageIcon size={16}/> {t.photoLibrary}</button><button disabled={uploading} onClick={()=>fileRef.current?.click()}><FileUp size={16}/> {t.file}</button></div>}<div className="form-grid"><label>{t.url}<input value={draft.url} onChange={event=>{setError('');setDraft(item=>({...item,url:event.target.value}))}} autoFocus/></label><Field label={t.mediaTitle} value={localize(draft.title,lang)} change={value=>setDraft(item=>({...item,title:localizedChange(item.title,value)}))}/><Field label={t.caption} value={localize(draft.caption,lang)} change={value=>setDraft(item=>({...item,caption:localizedChange(item.caption,value)}))}/><Field label={t.alt} value={localize(draft.alt,lang)} change={value=>setDraft(item=>({...item,alt:localizedChange(item.alt,value)}))}/></div>{draft.url&&<div className="media-preview"><MediaView node={{id:'preview',type:'multimedia',title:'',media:[draft]}} lang={lang}/></div>}{uploading&&<p className="warnings">{t.uploading}...</p>}{error&&<p className="errors">{error}</p>}<div className="modal-actions"><button onClick={close}>{t.cancel}</button><button className="primary" disabled={!draft.url.trim()||uploading} onClick={apply}>{t.create}</button></div></section></div>;
 }
 

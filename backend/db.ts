@@ -107,6 +107,16 @@ export class PgRunbookStore implements RunbookStore {
   }
  }
 
+ async isUploadReferenced(url:string){
+  const result=await this.pool.query(`SELECT EXISTS (
+   SELECT 1 FROM runbooks r, jsonb_array_elements(r.data->'nodes') node
+   WHERE EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(node->'media','[]'::jsonb)) media WHERE media->>'url'=$1)
+      OR EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(node->'outcomes','[]'::jsonb)) outcome,
+                              jsonb_array_elements(COALESCE(outcome->'media','[]'::jsonb)) media WHERE media->>'url'=$1)
+  ) AS referenced`,[url]);
+  return Boolean(result.rows[0]?.referenced);
+ }
+
  async close(){
   await this.pool.end();
  }
